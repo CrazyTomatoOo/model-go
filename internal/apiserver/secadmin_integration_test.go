@@ -17,14 +17,17 @@ import (
 var hexSID = regexp.MustCompile(`^[0-9a-f]{16}$`)
 
 // seedUserStatus inserts a user with the given status and returns its id.
+// must_change_password is set explicitly (false for active actors so the
+// must-change gate does not block their first request; true for pending
+// accounts, matching the create-API behavior).
 func (s *authStack) seedUserStatus(t *testing.T, username, role, plaintext, status string) int64 {
 	t.Helper()
 	hash, err := password.Hash(plaintext)
 	require.NoError(t, err)
 	var id int64
 	err = s.pool.QueryRow(s.ctx,
-		`INSERT INTO users (username, password_hash, role, status) VALUES ($1, $2, $3, $4) RETURNING id`,
-		username, hash, role, status).Scan(&id)
+		`INSERT INTO users (username, password_hash, role, status, must_change_password) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		username, hash, role, status, status == "pending").Scan(&id)
 	require.NoError(t, err)
 	return id
 }

@@ -100,7 +100,7 @@ func TestIntegration_AuditQueryPaginationFiltersAndOrder(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	s.seedUser(t, "audit-viewer", apistore.RoleAuditadmin, testPassword)
+	s.seedUser(t, "audit-viewer", apistore.RoleAuditadmin, testPassword, false)
 	login := loginRequest(s.engine, "audit-viewer", testPassword, "203.0.113.50")
 	require.Equal(t, http.StatusOK, login.Code)
 	sid := sidOf(t, login)
@@ -156,7 +156,7 @@ func TestIntegration_AuditQueryRoleIsolation(t *testing.T) {
 		{"sysadmin", apistore.RoleSysadmin},
 		{"secadmin", apistore.RoleSecadmin},
 	} {
-		s.seedUser(t, tc.username, tc.role, testPassword)
+		s.seedUser(t, tc.username, tc.role, testPassword, false)
 	}
 
 	// Given — an unauthenticated request hits the session middleware first.

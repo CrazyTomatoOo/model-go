@@ -20,6 +20,7 @@ type stubAuth struct {
 	loginFn  func(ctx context.Context, username, password, ip string) (service.LoginResult, error)
 	logoutFn func(ctx context.Context, sid string, user store.User, ip string) error
 	meFn     func(ctx context.Context, sid string) (store.User, string, error)
+	changeFn func(ctx context.Context, sid string, user store.User, oldPassword, newPassword, ip string) error
 }
 
 func (s *stubAuth) Login(ctx context.Context, username, password, ip string) (service.LoginResult, error) {
@@ -32,6 +33,10 @@ func (s *stubAuth) Logout(ctx context.Context, sid string, user store.User, ip s
 
 func (s *stubAuth) Me(ctx context.Context, sid string) (store.User, string, error) {
 	return s.meFn(ctx, sid)
+}
+
+func (s *stubAuth) ChangePassword(ctx context.Context, sid string, user store.User, oldPassword, newPassword, ip string) error {
+	return s.changeFn(ctx, sid, user, oldPassword, newPassword, ip)
 }
 
 const testUserJSON = `{"id":7,"username":"alice","role":"user","status":"active","must_change_password":false}`
@@ -49,6 +54,7 @@ func newAuthEngine(auth handler.AuthService, withUser bool) *gin.Engine {
 	engine.POST("/login", h.Login)
 	engine.POST("/logout", h.Logout)
 	engine.GET("/me", h.Me)
+	engine.POST("/password", h.Password)
 	return engine
 }
 

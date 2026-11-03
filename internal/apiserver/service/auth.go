@@ -19,11 +19,14 @@ type (
 		ByUsername(ctx context.Context, username string) (store.User, error)
 		ByID(ctx context.Context, id int64) (store.User, error)
 		TouchLastLogin(ctx context.Context, id int64) error
+		HistoryHashes(ctx context.Context, userID int64) ([]string, error)
+		ChangePassword(ctx context.Context, userID int64, newHash, oldHash string) error
 	}
 	SessionStore interface {
 		Create(ctx context.Context, userID int64) (store.Session, error)
 		Get(ctx context.Context, sid string) (store.Session, error)
 		Delete(ctx context.Context, sid string) error
+		ListByUser(ctx context.Context, userID int64) ([]string, error)
 	}
 	LockStore interface {
 		Count(ctx context.Context, username string) (int, error)
@@ -44,16 +47,16 @@ const (
 	KindAccountDisabled    = "ACCOUNT_DISABLED"
 	KindRateLimited        = "RATE_LIMITED"
 	KindSessionExpired     = "SESSION_EXPIRED"
+	KindValidationError    = "VALIDATION_ERROR"
 )
 
 // Error is a typed login outcome; the handler maps Kind to the §4.5
-// HTTP status and envelope.
+// HTTP status and envelope. Field names the request field that failed
+// validation; it is empty for non-validation errors.
 type Error struct {
 	Kind    string
+	Field   string
 	Message string
-	// Field names the request field that failed validation; it is empty
-	// for non-validation errors.
-	Field string
 }
 
 func (e *Error) Error() string { return e.Message }

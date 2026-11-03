@@ -18,6 +18,7 @@ type AuthService interface {
 	Login(ctx context.Context, username, password, ip string) (service.LoginResult, error)
 	Logout(ctx context.Context, sid string, user store.User, ip string) error
 	Me(ctx context.Context, sid string) (store.User, string, error)
+	ChangePassword(ctx context.Context, sid string, user store.User, oldPassword, newPassword, ip string) error
 }
 
 // AuthHandler serves the /api/v1/auth routes.
@@ -67,6 +68,8 @@ func writeAuthError(c *gin.Context, err error) {
 		writeError(c, http.StatusForbidden, service.KindAccountDisabled, serr.Message)
 	case service.KindRateLimited:
 		writeError(c, http.StatusTooManyRequests, service.KindRateLimited, serr.Message)
+	case service.KindValidationError:
+		writeFieldErrors(c, []gin.H{{"field": serr.Field, "message": serr.Message}})
 	case service.KindSessionExpired:
 		writeError(c, http.StatusUnauthorized, service.KindSessionExpired, serr.Message)
 	default:

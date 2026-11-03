@@ -43,13 +43,13 @@ func newAuthStack(t *testing.T) *authStack {
 	return &authStack{pool: pool, rdb: rdb, engine: apiserver.NewEngine(pool, rdb, logger), ctx: ctx}
 }
 
-func (s *authStack) seedUser(t *testing.T, username, role, plaintext string) {
+func (s *authStack) seedUser(t *testing.T, username, role, plaintext string, mustChange bool) {
 	t.Helper()
 	hash, err := password.Hash(plaintext)
 	require.NoError(t, err)
 	_, err = s.pool.Exec(s.ctx,
-		`INSERT INTO users (username, password_hash, role, status) VALUES ($1, $2, $3, 'active')`,
-		username, hash, role)
+		`INSERT INTO users (username, password_hash, role, status, must_change_password) VALUES ($1, $2, $3, 'active', $4)`,
+		username, hash, role, mustChange)
 	require.NoError(t, err)
 }
 
@@ -83,14 +83,27 @@ func authedRequest(engine *gin.Engine, method, path, sid, csrf, ip string) *http
 	return rec
 }
 
+func passwordChangeRequest(engine *gin.Engine, sid, csrf, body, ip string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: middleware.CookieName, Value: sid})
+	if csrf != "" {
+		req.Header.Set(middleware.CSRFHeader, csrf)
+	}
+	req.RemoteAddr = ip + ":1234"
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	return rec
+}
+
 func TestIntegration_LoginMeLogout(t *testing.T) {
 	s := newAuthStack(t)
-	s.seedUser(t, "alice", "user", testPassword)
+	s.seedUser(t, "alice", "user", testPassword, false)
 
 	// When — alice logs in with the right password
 	login := loginRequest(s.engine, "alice", testPassword, "203.0.113.10")
 	require.Equal(t, http.StatusOK, login.Code)
-	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":true},"csrf_token":"`+csrfToken(login.Body.String())+`"}`, login.Body.String())
+	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":false},"csrf_token":"`+csrfToken(login.Body.String())+`"}`, login.Body.String())
 	require.NotContains(t, login.Body.String(), "password_hash", "password hash must never be returned")
 	require.True(t, login.Result().Cookies()[0].HttpOnly)
 	require.True(t, login.Result().Cookies()[0].Secure)
@@ -102,7 +115,7 @@ func TestIntegration_LoginMeLogout(t *testing.T) {
 	// Then — me returns the user and the same CSRF token
 	me := authedRequest(s.engine, http.MethodGet, "/api/v1/auth/me", sid, "", "203.0.113.10")
 	require.Equal(t, http.StatusOK, me.Code)
-	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":true},"csrf_token":"`+csrf+`"}`, me.Body.String())
+	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":false},"csrf_token":"`+csrf+`"}`, me.Body.String())
 
 	// When — alice logs out with the CSRF token
 	logoutResp := authedRequest(s.engine, http.MethodPost, "/api/v1/auth/logout", sid, csrf, "203.0.113.10")
@@ -129,10 +142,10 @@ func TestIntegration_LoginMeLogout(t *testing.T) {
 
 func TestIntegration_LoginFailuresLockoutRateLimitCSRFAndRole(t *testing.T) {
 	s := newAuthStack(t)
-	s.seedUser(t, "alice", "user", testPassword)
-	s.seedUser(t, "bob", "sysadmin", testPassword)
-	s.seedUser(t, "carol", "user", testPassword)
-	s.seedUser(t, "dave", "user", testPassword)
+	s.seedUser(t, "alice", "user", testPassword, true)
+	s.seedUser(t, "bob", "sysadmin", testPassword, true)
+	s.seedUser(t, "carol", "user", testPassword, false)
+	s.seedUser(t, "dave", "user", testPassword, true)
 
 	// Unified 401: wrong password and unknown user are indistinguishable
 	wrong := loginRequest(s.engine, "alice", "wrong-password", "203.0.113.20")
@@ -208,6 +221,67 @@ func TestIntegration_LoginFailuresLockoutRateLimitCSRFAndRole(t *testing.T) {
 	require.Contains(t, reasons, "invalid_password")
 	require.Contains(t, reasons, "user_not_found")
 	require.Contains(t, reasons, "locked")
+}
+
+func TestIntegration_PasswordChangeFlow(t *testing.T) {
+	s := newAuthStack(t)
+	s.seedUser(t, "alice", "user", testPassword, true)
+
+	// Given — alice logs in with the seeded must-change password
+	login := loginRequest(s.engine, "alice", testPassword, "203.0.113.50")
+	require.Equal(t, http.StatusOK, login.Code)
+	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":true},"csrf_token":"`+csrfToken(login.Body.String())+`"}`, login.Body.String())
+	sid := sidOf(t, login)
+	csrf := csrfToken(login.Body.String())
+
+	// Then — while must-change, /auth/me passes but logout is blocked by the gate
+	me := authedRequest(s.engine, http.MethodGet, "/api/v1/auth/me", sid, "", "203.0.113.50")
+	require.Equal(t, http.StatusOK, me.Code)
+	blocked := authedRequest(s.engine, http.MethodPost, "/api/v1/auth/logout", sid, csrf, "203.0.113.50")
+	require.Equal(t, http.StatusForbidden, blocked.Code)
+	require.JSONEq(t, `{"code":"PASSWORD_CHANGE_REQUIRED","message":"需要修改密码后才能继续操作"}`, blocked.Body.String())
+
+	// Then — the state-changing route requires the CSRF token
+	noToken := passwordChangeRequest(s.engine, sid, "", `{"old_password":"`+testPassword+`","new_password":"New-Strong-Passw0rd-1!"}`, "203.0.113.50")
+	require.Equal(t, http.StatusForbidden, noToken.Code)
+	require.JSONEq(t, `{"code":"CSRF_TOKEN_INVALID","message":"CSRF token 无效"}`, noToken.Body.String())
+
+	// Then — a wrong old password is a field-scoped 400
+	wrongOld := passwordChangeRequest(s.engine, sid, csrf, `{"old_password":"wrong","new_password":"New-Strong-Passw0rd-1!"}`, "203.0.113.50")
+	require.Equal(t, http.StatusBadRequest, wrongOld.Code)
+	require.JSONEq(t, `{"code":"VALIDATION_ERROR","message":"请求参数校验失败","errors":[{"field":"old_password","message":"旧密码不正确"}]}`, wrongOld.Body.String())
+
+	// Then — a policy-weak new password is a field-scoped 400
+	weak := passwordChangeRequest(s.engine, sid, csrf, `{"old_password":"`+testPassword+`","new_password":"short"}`, "203.0.113.50")
+	require.Equal(t, http.StatusBadRequest, weak.Code)
+	require.JSONEq(t, `{"code":"VALIDATION_ERROR","message":"请求参数校验失败","errors":[{"field":"new_password","message":"密码长度不足，至少需要 16 位"}]}`, weak.Body.String())
+
+	// When — alice changes to a valid new password
+	ok := passwordChangeRequest(s.engine, sid, csrf, `{"old_password":"`+testPassword+`","new_password":"New-Strong-Passw0rd-1!"}`, "203.0.113.50")
+	require.Equal(t, http.StatusNoContent, ok.Code)
+
+	// Then — the session survives and must_change_password is cleared
+	meAfter := authedRequest(s.engine, http.MethodGet, "/api/v1/auth/me", sid, "", "203.0.113.50")
+	require.Equal(t, http.StatusOK, meAfter.Code)
+	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":false},"csrf_token":"`+csrf+`"}`, meAfter.Body.String())
+
+	// Then — the old password stops working and the new one logs in
+	oldLogin := loginRequest(s.engine, "alice", testPassword, "203.0.113.51")
+	require.Equal(t, http.StatusUnauthorized, oldLogin.Code)
+	newLogin := loginRequest(s.engine, "alice", "New-Strong-Passw0rd-1!", "203.0.113.51")
+	require.Equal(t, http.StatusOK, newLogin.Code)
+	require.JSONEq(t, `{"user":{"id":1,"username":"alice","role":"user","status":"active","must_change_password":false},"csrf_token":"`+csrfToken(newLogin.Body.String())+`"}`, newLogin.Body.String())
+
+	// Then — reusing the original password (still in the last-5 history) is rejected
+	reuse := passwordChangeRequest(s.engine, sid, csrf, `{"old_password":"New-Strong-Passw0rd-1!","new_password":"`+testPassword+`"}`, "203.0.113.50")
+	require.Equal(t, http.StatusBadRequest, reuse.Code)
+	require.JSONEq(t, `{"code":"VALIDATION_ERROR","message":"请求参数校验失败","errors":[{"field":"new_password","message":"新密码不得与当前密码或最近 5 次历史密码相同"}]}`, reuse.Body.String())
+
+	// Then — exactly one password-change audit row was written
+	var changes int
+	err := s.pool.QueryRow(s.ctx, `SELECT count(*) FROM audit_logs WHERE action = 'auth.password_change'`).Scan(&changes)
+	require.NoError(t, err)
+	require.Equal(t, 1, changes)
 }
 
 func csrfToken(body string) string {

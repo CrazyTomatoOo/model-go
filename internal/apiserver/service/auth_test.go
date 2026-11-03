@@ -26,11 +26,21 @@ func activeUser(username string) store.User {
 	return store.User{ID: 7, Username: username, PasswordHash: testUserHash, Role: store.RoleUser, Status: store.StatusActive}
 }
 
+type changeCall struct {
+	userID  int64
+	newHash string
+	oldHash string
+}
+
 type stubUsers struct {
-	byUsername func(context.Context, string) (store.User, error)
-	byID       func(context.Context, int64) (store.User, error)
-	touched    []int64
-	touchErr   error
+	byUsername  func(context.Context, string) (store.User, error)
+	byID        func(context.Context, int64) (store.User, error)
+	touched     []int64
+	touchErr    error
+	history     []string
+	historyErr  error
+	changeCalls []changeCall
+	changeErr   error
 }
 
 func (s *stubUsers) ByUsername(ctx context.Context, username string) (store.User, error) {
@@ -46,12 +56,22 @@ func (s *stubUsers) TouchLastLogin(ctx context.Context, id int64) error {
 	return s.touchErr
 }
 
+func (s *stubUsers) HistoryHashes(ctx context.Context, userID int64) ([]string, error) {
+	return s.history, s.historyErr
+}
+
+func (s *stubUsers) ChangePassword(ctx context.Context, userID int64, newHash, oldHash string) error {
+	s.changeCalls = append(s.changeCalls, changeCall{userID: userID, newHash: newHash, oldHash: oldHash})
+	return s.changeErr
+}
+
 type stubSessions struct {
-	created   []int64
-	create    func(context.Context, int64) (store.Session, error)
-	deleted   []string
-	getResult store.Session
-	getErr    error
+	created    []int64
+	create     func(context.Context, int64) (store.Session, error)
+	deleted    []string
+	getResult  store.Session
+	getErr     error
+	listByUser func(context.Context, int64) ([]string, error)
 }
 
 func (s *stubSessions) Create(ctx context.Context, userID int64) (store.Session, error) {
@@ -66,6 +86,13 @@ func (s *stubSessions) Get(ctx context.Context, sid string) (store.Session, erro
 func (s *stubSessions) Delete(ctx context.Context, sid string) error {
 	s.deleted = append(s.deleted, sid)
 	return nil
+}
+
+func (s *stubSessions) ListByUser(ctx context.Context, userID int64) ([]string, error) {
+	if s.listByUser == nil {
+		return nil, errors.New("unexpected ListByUser call")
+	}
+	return s.listByUser(ctx, userID)
 }
 
 type stubLocks struct {
@@ -113,11 +140,13 @@ type authStubs struct {
 
 func newAuthStubs() *authStubs {
 	s := &authStubs{
-		users:    &stubUsers{byUsername: func(context.Context, string) (store.User, error) { return store.User{}, store.ErrUserNotFound }},
-		sessions: &stubSessions{create: func(context.Context, int64) (store.Session, error) { return store.Session{}, errors.New("unexpected create") }},
-		locks:    &stubLocks{},
-		rate:     &stubRate{allowed: true},
-		audits:   &stubAudit{},
+		users: &stubUsers{byUsername: func(context.Context, string) (store.User, error) { return store.User{}, store.ErrUserNotFound }},
+		sessions: &stubSessions{create: func(context.Context, int64) (store.Session, error) {
+			return store.Session{}, errors.New("unexpected create")
+		}},
+		locks:  &stubLocks{},
+		rate:   &stubRate{allowed: true},
+		audits: &stubAudit{},
 	}
 	s.users.byID = func(_ context.Context, id int64) (store.User, error) { return store.User{}, store.ErrUserNotFound }
 	return s
@@ -269,7 +298,9 @@ func TestLoginPropagatesStoreErrors(t *testing.T) {
 func TestLoginAuditFailureErrorsAreSwallowed(t *testing.T) {
 	st := newAuthStubs()
 	st.audits.err = errors.New("audit down")
-	st.users.byUsername = func(_ context.Context, username string) (store.User, error) { return store.User{}, store.ErrUserNotFound }
+	st.users.byUsername = func(_ context.Context, username string) (store.User, error) {
+		return store.User{}, store.ErrUserNotFound
+	}
 
 	_, err := st.service().Login(context.Background(), "ghost", "Str0ng!Pass42", "10.0.0.1")
 	require.ErrorIs(t, err, ErrInvalidCredentials)

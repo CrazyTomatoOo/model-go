@@ -28,7 +28,7 @@ func adminRequest(engine *gin.Engine, method, path, sid, csrf, ip, body string) 
 
 func TestIntegration_UserAdminCreateResetDisable(t *testing.T) {
 	s := newAuthStack(t)
-	s.seedUser(t, "bob", "sysadmin", testPassword)
+	s.seedUser(t, "bob", "sysadmin", testPassword, false)
 	bobLogin := loginRequest(s.engine, "bob", testPassword, "203.0.113.100")
 	require.Equal(t, http.StatusOK, bobLogin.Code)
 	bobSid := sidOf(t, bobLogin)
@@ -99,7 +99,7 @@ func TestIntegration_UserAdminCreateResetDisable(t *testing.T) {
 	require.Equal(t, bobIP, prefix.Addr().String())
 
 	// Reset — an active user's password is replaced, status unchanged
-	s.seedUser(t, "alice", "user", testPassword)
+	s.seedUser(t, "alice", "user", testPassword, false)
 	var aliceID int64
 	require.NoError(t, s.pool.QueryRow(s.ctx, `SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID))
 	aliceLogin := loginRequest(s.engine, "alice", testPassword, "203.0.113.102")
@@ -173,7 +173,7 @@ func TestIntegration_UserAdminCreateResetDisable(t *testing.T) {
 	require.JSONEq(t, `{"code":"VALIDATION_ERROR","message":"请求参数校验失败","errors":[{"field":"id","message":"用户 ID 无效"}]}`, badID.Body.String())
 
 	// Non-sysadmin roles → 403; unauthenticated → 401
-	s.seedUser(t, "dave", "user", testPassword)
+	s.seedUser(t, "dave", "user", testPassword, false)
 	daveLogin := loginRequest(s.engine, "dave", testPassword, "203.0.113.107")
 	require.Equal(t, http.StatusOK, daveLogin.Code)
 	daveDenied := adminRequest(s.engine, http.MethodPost, "/api/v1/users", sidOf(t, daveLogin), csrfToken(daveLogin.Body.String()), "203.0.113.107",

@@ -83,7 +83,7 @@ func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.
 
 	v1 := engine.Group("/api/v1")
 	v1.POST("/auth/login", auth.Login)
-	authed := v1.Group("", middleware.Session(sessions, users, logger), middleware.CSRF())
+	authed := v1.Group("", middleware.Session(sessions, users, logger), middleware.CSRF(), middleware.MustChangeGate())
 	authed.POST("/auth/logout", auth.Logout)
 	authed.GET("/auth/me", auth.Me)
 	// GET /audit-logs is the auditadmin-only read API (spec §4.4/§4.6);
@@ -97,6 +97,7 @@ func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.
 	authed.POST("/users/:id/unlock", middleware.RequireRole(apistore.RoleSecadmin), sec.Unlock)
 	authed.GET("/sessions", middleware.RequireRole(apistore.RoleSecadmin), sec.ListSessions)
 	authed.DELETE("/sessions/:sid", middleware.RequireRole(apistore.RoleSecadmin), sec.ForceLogout)
+	authed.POST("/auth/password", auth.Password)
 	return engine
 }
 

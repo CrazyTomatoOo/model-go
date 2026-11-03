@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"testing"
 	"time"
@@ -142,5 +143,33 @@ func TestStoreIntegration_PostgresStores(t *testing.T) {
 			`SELECT ip IS NULL FROM audit_logs WHERE action = 'auth.login_failure'`).Scan(&ipIsNull)
 		require.NoError(t, err)
 		require.True(t, ipIsNull)
+	})
+
+	t.Run("change_password_records_history_and_trims_to_5", func(t *testing.T) {
+		users := store.NewUserStore(pool)
+
+		var id int64
+		err := pool.QueryRow(ctx,
+			`INSERT INTO users (username, password_hash, role, status)
+			 VALUES ('eve', $1, 'user', 'active') RETURNING id`, "hash-0").Scan(&id)
+		require.NoError(t, err)
+
+		for i := 1; i <= 6; i++ {
+			require.NoError(t, users.ChangePassword(ctx, id, fmt.Sprintf("new-hash-%d", i), fmt.Sprintf("old-hash-%d", i)))
+		}
+
+		var mustChange bool
+		err = pool.QueryRow(ctx, `SELECT must_change_password FROM users WHERE id = $1`, id).Scan(&mustChange)
+		require.NoError(t, err)
+		require.False(t, mustChange)
+
+		var hash string
+		err = pool.QueryRow(ctx, `SELECT password_hash FROM users WHERE id = $1`, id).Scan(&hash)
+		require.NoError(t, err)
+		require.Equal(t, "new-hash-6", hash)
+
+		history, err := users.HistoryHashes(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, []string{"old-hash-6", "old-hash-5", "old-hash-4", "old-hash-3", "old-hash-2"}, history)
 	})
 }

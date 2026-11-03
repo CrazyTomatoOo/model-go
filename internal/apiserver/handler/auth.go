@@ -114,3 +114,41 @@ func clearSessionCookie() *http.Cookie {
 	cookie.MaxAge = -1
 	return cookie
 }
+
+// Password handles POST /api/v1/auth/password (spec §4.1/§6): validates the
+// body, delegates the change to the service, and returns 204. The session
+// middleware has already authenticated the request and the must-change gate
+// has already verified the user is allowed to change their password.
+func (h *AuthHandler) Password(c *gin.Context) {
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeFieldErrors(c, []gin.H{{"field": "body", "message": "请求体必须是 JSON"}})
+		return
+	}
+	var fields []gin.H
+	if req.OldPassword == "" {
+		fields = append(fields, gin.H{"field": "old_password", "message": "旧密码不能为空"})
+	}
+	if req.NewPassword == "" {
+		fields = append(fields, gin.H{"field": "new_password", "message": "新密码不能为空"})
+	}
+	if len(fields) > 0 {
+		writeFieldErrors(c, fields)
+		return
+	}
+
+	sid, err := c.Cookie(middleware.CookieName)
+	if err != nil {
+		writeError(c, http.StatusUnauthorized, "SESSION_EXPIRED", "会话已过期，请重新登录")
+		return
+	}
+	user := c.MustGet(middleware.UserKey).(store.User)
+	if err := h.auth.ChangePassword(c.Request.Context(), sid, user, req.OldPassword, req.NewPassword, c.ClientIP()); err != nil {
+		writeAuthError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
