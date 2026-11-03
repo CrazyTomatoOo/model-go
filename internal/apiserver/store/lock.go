@@ -21,8 +21,8 @@ const (
 	RateLimitWindow    = time.Minute
 )
 
-func lockKey(username string) string     { return "lock:" + username }
-func rateLimitKey(ip string) string      { return "rl:" + ip }
+func lockKey(username string) string { return "lock:" + username }
+func rateLimitKey(ip string) string  { return "rl:" + ip }
 
 // LockStore manages the lock:{username} consecutive-failure counter.
 type LockStore struct {
