@@ -1,0 +1,2 @@
+# Override values for accelerator device plugins (NVIDIA GPU / Ascend NPU / domestic cards).
+# Per-device-plugin charts are installed on demand per member cluster hardware.

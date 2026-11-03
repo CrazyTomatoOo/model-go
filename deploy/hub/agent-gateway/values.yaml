@@ -1,0 +1,10 @@
+image:
+  repository: ghcr.io/crazytomatooo/model-go-agent-gateway
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: LoadBalancer
+  port: 9443

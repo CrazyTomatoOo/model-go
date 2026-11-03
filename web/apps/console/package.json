@@ -1,0 +1,6 @@
+{
+  "name": "@model-go/console",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Web console (React + Ant Design) for the model-go platform."
+}

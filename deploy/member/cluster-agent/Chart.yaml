@@ -1,0 +1,6 @@
+apiVersion: v2
+name: model-go-cluster-agent
+description: Member cluster-agent (pull-based agent)
+type: application
+version: 0.1.0
+appVersion: 0.1.0
