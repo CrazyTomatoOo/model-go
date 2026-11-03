@@ -8,6 +8,7 @@ Multi-context domain glossary index for this monorepo. Each context owns one `GL
 | Training | Training jobs, datasets, checkpointing, distributed strategies | `docs/glossary/training.md` |
 | Inference | Inference services, models, routing, autoscaling | `docs/glossary/inference.md` |
 | Compute | Heterogeneous accelerators (GPU/NPU/domestic cards), capacity, scheduling | `docs/glossary/compute.md` |
+| Security | Authentication, sessions, RBAC, audit trail, login hardening | `docs/glossary/security.md` |
 
 Context-scoped ADRs, when a decision applies to one context only, live in `docs/adr/` alongside the rest and are prefixed with the context name (e.g. `0002-training-job-lifecycle.md`).
 

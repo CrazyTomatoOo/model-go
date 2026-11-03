@@ -14,16 +14,27 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		slog.Error("apiserver exited with error", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	if len(os.Args) < 2 || os.Args[1] != "serve" {
+func run(args []string) error {
+	if len(args) < 1 {
 		return usage()
 	}
+	switch args[0] {
+	case "serve":
+		return serve()
+	case "admin":
+		return runAdmin(args[1:])
+	default:
+		return usage()
+	}
+}
+
+func serve() error {
 	cfg, err := apiserver.ConfigFromEnv()
 	if err != nil {
 		return err
@@ -39,11 +50,12 @@ func usage() error {
 
 Usage:
   apiserver serve
+  apiserver admin bootstrap   create the three initial admin accounts
 
 Environment (MODELGO_*):
   MODELGO_HTTP_ADDR     listen address (default ":8080")
   MODELGO_POSTGRES_DSN  Postgres DSN, required (e.g. postgres://user:pass@host:5432/modelgo?sslmode=disable)
-  MODELGO_REDIS_ADDR    Redis address, required (e.g. 127.0.0.1:6379)
+  MODELGO_REDIS_ADDR    Redis address, required for serve (e.g. 127.0.0.1:6379)
 `)
-	return errors.New("expected subcommand: serve")
+	return errors.New("expected subcommand: serve | admin bootstrap")
 }

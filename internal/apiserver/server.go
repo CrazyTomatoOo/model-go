@@ -13,7 +13,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/CrazyTomatoOo/model-go/internal/apiserver/handler"
 	"github.com/CrazyTomatoOo/model-go/internal/apiserver/middleware"
+	"github.com/CrazyTomatoOo/model-go/internal/apiserver/service"
+	apistore "github.com/CrazyTomatoOo/model-go/internal/apiserver/store"
 	"github.com/CrazyTomatoOo/model-go/pkg/store"
 )
 
@@ -49,9 +52,10 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// NewEngine builds the gin engine: the spec §8 middleware chain (requestid →
-// recovery → securityheaders → accesslog) and the GET /healthz route.
-func NewEngine(pool *pgxpool.Pool, logger *slog.Logger) *gin.Engine {
+// NewEngine builds the gin engine: the spec §8 middleware chain (requestid
+// → recovery → securityheaders → accesslog), the GET /healthz route, and the
+// /api/v1/auth routes behind the session and CSRF middleware (§4.1).
+func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(
@@ -63,6 +67,20 @@ func NewEngine(pool *pgxpool.Pool, logger *slog.Logger) *gin.Engine {
 	engine.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	users := apistore.NewUserStore(pool)
+	sessions := apistore.NewSessionStore(rdb)
+	locks := apistore.NewLockStore(rdb)
+	rate := apistore.NewRateLimiter(rdb)
+	audits := apistore.NewAuditStore(pool)
+	authService := service.NewAuthService(users, sessions, locks, rate, audits, logger)
+	auth := handler.NewAuthHandler(authService)
+
+	v1 := engine.Group("/api/v1")
+	v1.POST("/auth/login", auth.Login)
+	authed := v1.Group("", middleware.Session(sessions, users, logger), middleware.CSRF())
+	authed.POST("/auth/logout", auth.Logout)
+	authed.GET("/auth/me", auth.Me)
 	return engine
 }
 
@@ -91,7 +109,7 @@ func Run(ctx context.Context, cfg Config, logger *slog.Logger) error {
 		return fmt.Errorf("ping redis: %w", err)
 	}
 
-	engine := NewEngine(pool, logger)
+	engine := NewEngine(pool, rdb, logger)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           engine,

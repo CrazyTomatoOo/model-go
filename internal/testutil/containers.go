@@ -35,8 +35,7 @@ func StartPostgres(ctx context.Context, t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	requireDocker(t, ctx)
 
-	container, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16-alpine"),
+	container, err := postgres.Run(ctx, "postgres:16-alpine",
 		postgres.WithDatabase("modelgo"),
 		postgres.WithUsername("modelgo"),
 		postgres.WithPassword("modelgo"),
@@ -77,7 +76,7 @@ func StartRedis(ctx context.Context, t *testing.T) *redis.Client {
 	t.Helper()
 	requireDocker(t, ctx)
 
-	container, err := redismod.RunContainer(ctx, testcontainers.WithImage("redis:7-alpine"))
+	container, err := redismod.Run(ctx, "redis:7-alpine")
 	if err != nil {
 		t.Fatalf("start redis container: %v", err)
 	}

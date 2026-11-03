@@ -20,7 +20,7 @@ func TestIntegration_MigrateFromScratch_then_healthz_serves_200_with_security_he
 	// Given
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	pool, _ := testutil.StartStack(ctx, t)
+	pool, rdb := testutil.StartStack(ctx, t)
 
 	// When — migrations applied to a fresh database
 	require.NoError(t, store.Migrate(ctx, pool))
@@ -82,7 +82,7 @@ func TestIntegration_MigrateFromScratch_then_healthz_serves_200_with_security_he
 
 	// When — GET /healthz through the real middleware chain
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	engine := apiserver.NewEngine(pool, logger)
+	engine := apiserver.NewEngine(pool, rdb, logger)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	engine.ServeHTTP(rec, req)
