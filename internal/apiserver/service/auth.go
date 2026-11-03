@@ -51,6 +51,9 @@ const (
 type Error struct {
 	Kind    string
 	Message string
+	// Field names the request field that failed validation; it is empty
+	// for non-validation errors.
+	Field string
 }
 
 func (e *Error) Error() string { return e.Message }
@@ -86,12 +89,14 @@ func NewAuthService(users UserStore, sessions SessionStore, locks LockStore, rat
 	return &AuthService{users: users, sessions: sessions, locks: locks, rate: rate, audits: audits, logger: logger}
 }
 
-// dummyHash is verified against when the submitted username does not exist,
-// so the response time matches the wrong-password path (spec §4.1: no
-// account-existence oracle). The params are fixed and valid, so hashing
-// cannot fail; the panic guards a future params change.
+// dummyPlaintext/dummyHash are verified against when the submitted
+// username does not exist, so the response time matches the wrong-password
+// path (spec §4.1: no account-existence oracle). The params are fixed and
+// valid, so hashing cannot fail; the panic guards a future params change.
+const dummyPlaintext = "timing-equivalence-dummy-password"
+
 var dummyHash = func() string {
-	h, err := password.Hash("timing-equivalence-dummy-password")
+	h, err := password.Hash(dummyPlaintext)
 	if err != nil {
 		panic(err)
 	}

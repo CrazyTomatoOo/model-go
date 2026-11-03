@@ -76,6 +76,8 @@ func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.
 	authService := service.NewAuthService(users, sessions, locks, rate, audits, logger)
 	auth := handler.NewAuthHandler(authService)
 	audit := handler.NewAuditHandler(audits)
+	usersService := service.NewUsersService(users, sessions, audits, logger)
+	usersHandler := handler.NewUsersHandler(usersService)
 
 	v1 := engine.Group("/api/v1")
 	v1.POST("/auth/login", auth.Login)
@@ -85,6 +87,10 @@ func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.
 	// GET /audit-logs is the auditadmin-only read API (spec §4.4/§4.6);
 	// the role check runs per-route behind session+CSRF.
 	authed.GET("/audit-logs", middleware.RequireRole(apistore.RoleAuditadmin), audit.List)
+	sysadmin := authed.Group("", middleware.RequireRole(apistore.RoleSysadmin))
+	sysadmin.POST("/users", usersHandler.Create)
+	sysadmin.PATCH("/users/:id/password", usersHandler.ResetPassword)
+	sysadmin.POST("/users/:id/disable", usersHandler.Disable)
 	return engine
 }
 
