@@ -1,2 +1,3 @@
-// Package apiserver is a placeholder for the apiserver layer; see docs/adr/0001-monorepo-architecture.md.
+// Package apiserver implements the hub REST surface (ADR-0001): a gin
+// engine with the login design spec §8 middleware chain and /healthz.
 package apiserver

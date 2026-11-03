@@ -1,2 +1,3 @@
-// Package store is a placeholder for the store layer; see docs/adr/0001-monorepo-architecture.md.
+// Package store is the shared data layer (ADR-0001): Postgres schema
+// migrations and queries.
 package store
