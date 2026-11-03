@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/login-auth]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: gofmt + vet + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.3'
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l internal/ cmd/ pkg/ 2>/dev/null)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.3'
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+
+  test:
+    name: go test (testcontainers PG + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.3'
+          cache: true
+
+      # testcontainers-go drives Docker directly; ubuntu runners expose the socket.
+      - name: Docker info
+        run: docker version
+
+      - name: go test
+        run: go test ./... -count=1 -timeout 15m

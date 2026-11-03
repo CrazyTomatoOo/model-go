@@ -1,0 +1,3 @@
+# Override values for the Volcano chart (batch scheduler on member clusters).
+# Install: helm repo add volcano https://volcano-sh.github.io/charts
+#          helm install volcano volcano/volcano -f deploy/member/addons/volcano.values.yaml

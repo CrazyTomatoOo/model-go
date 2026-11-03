@@ -1,0 +1,6 @@
+apiVersion: v2
+name: model-go-scheduler
+description: Hub scheduler (queueing, scoring, binding)
+type: application
+version: 0.1.0
+appVersion: 0.1.0
