@@ -78,6 +78,8 @@ func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.
 	audit := handler.NewAuditHandler(audits)
 	usersService := service.NewUsersService(users, sessions, audits, logger)
 	usersHandler := handler.NewUsersHandler(usersService)
+	secadminService := service.NewSecadminService(users, sessions, locks, audits, logger)
+	sec := handler.NewSecadminHandler(secadminService)
 
 	v1 := engine.Group("/api/v1")
 	v1.POST("/auth/login", auth.Login)
@@ -91,6 +93,10 @@ func NewEngine(pool *pgxpool.Pool, rdb *redis.Client, logger *slog.Logger) *gin.
 	sysadmin.POST("/users", usersHandler.Create)
 	sysadmin.PATCH("/users/:id/password", usersHandler.ResetPassword)
 	sysadmin.POST("/users/:id/disable", usersHandler.Disable)
+	authed.POST("/users/:id/approve", middleware.RequireRole(apistore.RoleSecadmin), sec.Approve)
+	authed.POST("/users/:id/unlock", middleware.RequireRole(apistore.RoleSecadmin), sec.Unlock)
+	authed.GET("/sessions", middleware.RequireRole(apistore.RoleSecadmin), sec.ListSessions)
+	authed.DELETE("/sessions/:sid", middleware.RequireRole(apistore.RoleSecadmin), sec.ForceLogout)
 	return engine
 }
 
