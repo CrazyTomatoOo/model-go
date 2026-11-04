@@ -126,4 +126,64 @@ describe('apiFetch', () => {
     expect((init?.headers as Record<string, string>)['X-CSRF-Token']).toBe('tok-abc');
     expect(getCsrfToken()).toBe('tok-abc');
   });
+
+  it('refreshes the CSRF token via GET /auth/me and retries once on CSRF_TOKEN_INVALID', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'POST' && path === '/api/v1/auth/logout') {
+        if (getCsrfToken() === 'tok-stale') {
+          return new Response(
+            JSON.stringify({ code: 'CSRF_TOKEN_INVALID', message: 'stale token' }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return new Response(null, { status: 204 });
+      }
+      if (method === 'GET' && path === '/api/v1/auth/me') {
+        return new Response(JSON.stringify({ csrf_token: 'tok-fresh' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected fetch: ${method} ${path}`);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    setCsrfToken('tok-stale');
+
+    await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+
+    expect(getCsrfToken()).toBe('tok-fresh');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const retryInit = fetchMock.mock.calls[2][1];
+    expect((retryInit?.headers as Record<string, string>)['X-CSRF-Token']).toBe('tok-fresh');
+  });
+
+  it('retries only once when the refreshed token is still rejected', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'POST' && path === '/api/v1/auth/logout') {
+        return new Response(
+          JSON.stringify({ code: 'CSRF_TOKEN_INVALID', message: 'still stale' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (method === 'GET' && path === '/api/v1/auth/me') {
+        return new Response(JSON.stringify({ csrf_token: 'tok-fresh' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected fetch: ${method} ${path}`);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    setCsrfToken('tok-stale');
+
+    const error = await apiFetch('/api/v1/auth/logout', { method: 'POST' }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe('CSRF_TOKEN_INVALID');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });

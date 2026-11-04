@@ -5,7 +5,9 @@ import {
   useEffect,
   useMemo,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 import { setCsrfToken } from '../lib/auth';
 import { apiFetch, setOnGlobalError } from '../lib/request';
@@ -29,6 +31,8 @@ type AuthContextValue = {
   loading: boolean;
   refresh: () => Promise<void>;
   clearUser: () => void;
+  /** Replaces the in-memory user (login response, post-change flag flip). */
+  setUser: Dispatch<SetStateAction<ConsoleUser | null>>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -43,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const res = await apiFetch<MeResponse>('/auth/me');
+    const res = await apiFetch<MeResponse>('/api/v1/auth/me');
     setUser(res.user);
     setCsrfToken(res.csrf_token);
   }, []);
@@ -71,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // /auth/me call is resolved here (user=null) and by the route guards instead.
   useEffect(() => {
     setOnGlobalError((error, path) => {
-      if (path === '/auth/me') {
+      if (path === '/api/v1/auth/me') {
         return;
       }
       if (error.code === 'SESSION_EXPIRED') {
@@ -85,8 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearUser]);
 
   const value = useMemo(
-    () => ({ user, loading, refresh, clearUser }),
-    [user, loading, refresh, clearUser],
+    () => ({ user, loading, refresh, clearUser, setUser }),
+    [user, loading, refresh, clearUser, setUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

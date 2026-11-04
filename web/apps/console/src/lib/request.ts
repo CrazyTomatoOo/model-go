@@ -1,14 +1,27 @@
-import { getCsrfToken } from './auth';
+import { getCsrfToken, setCsrfToken } from './auth';
+
+export type FieldError = {
+  field?: string;
+  message?: string;
+};
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
+  /** Field-level details carried by 400 VALIDATION_ERROR responses (§4.5). */
+  readonly errors: FieldError[] | null;
 
-  constructor(status: number, message: string, code: string | null = null) {
+  constructor(
+    status: number,
+    message: string,
+    code: string | null = null,
+    errors: FieldError[] | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.errors = errors;
   }
 }
 
@@ -24,6 +37,7 @@ async function readError(response: Response): Promise<ApiError> {
   const raw = await response.text();
   let message: string | null = null;
   let code: string | null = null;
+  let errors: FieldError[] | null = null;
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -35,12 +49,29 @@ async function readError(response: Response): Promise<ApiError> {
         if (typeof obj.code === 'string') {
           code = obj.code;
         }
+        if (Array.isArray(obj.errors)) {
+          errors = obj.errors.map((entry) => {
+            if (typeof entry !== 'object' || entry === null) {
+              return {};
+            }
+            const fe = entry as JsonObject;
+            return {
+              field: typeof fe.field === 'string' ? fe.field : undefined,
+              message: typeof fe.message === 'string' ? fe.message : undefined,
+            };
+          });
+        }
       }
     } catch {
       // non-JSON error body; fall back to the generic message below
     }
   }
-  return new ApiError(response.status, message ?? `Request failed: ${response.status}`, code);
+  return new ApiError(
+    response.status,
+    message ?? `Request failed: ${response.status}`,
+    code,
+    errors,
+  );
 }
 
 /**
@@ -58,6 +89,14 @@ export function setOnGlobalError(handler: GlobalErrorHandler | null): void {
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  return apiFetchInner<T>(path, options, false);
+}
+
+async function apiFetchInner<T>(
+  path: string,
+  options: ApiRequestOptions,
+  retried: boolean,
+): Promise<T> {
   const { method = 'GET', body } = options;
   // Spec §4.1: X-CSRF-Token must match the session's token on state-changing requests.
   const csrfToken = options.csrfToken !== undefined ? options.csrfToken : getCsrfToken();
@@ -78,6 +117,18 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
 
   if (!response.ok) {
     const error = await readError(response);
+    if (!retried && error.status === 403 && error.code === 'CSRF_TOKEN_INVALID') {
+      // Spec §4 全局约定: a stale CSRF token is refreshed via GET /auth/me and
+      // the original request is retried exactly once.
+      const refreshResponse = await fetch('/api/v1/auth/me');
+      if (refreshResponse.ok) {
+        const data = (await refreshResponse.json()) as { csrf_token?: unknown };
+        if (typeof data.csrf_token === 'string') {
+          setCsrfToken(data.csrf_token);
+          return apiFetchInner<T>(path, { ...options, csrfToken: undefined }, true);
+        }
+      }
+    }
     if (error.code === 'SESSION_EXPIRED' || error.code === 'PASSWORD_CHANGE_REQUIRED') {
       onGlobalError?.(error, path);
     }
