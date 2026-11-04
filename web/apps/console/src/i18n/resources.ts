@@ -16,6 +16,8 @@ export const resources = {
       'changePassword.submit': 'Update Password',
       'console.title': 'Console Overview',
       'console.hello': 'Welcome to the ModelGo console.',
+      'shell.logout': 'Log out',
+      'shell.placeholder': 'Signed in. The workspace arrives in a later iteration.',
     },
   },
   zh: {
@@ -35,6 +37,8 @@ export const resources = {
       'changePassword.submit': '更新密码',
       'console.title': '控制台总览',
       'console.hello': '欢迎使用 ModelGo 控制台。',
+      'shell.logout': '退出登录',
+      'shell.placeholder': '工作台待后续迭代',
     },
   },
 };

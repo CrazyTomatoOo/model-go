@@ -11,6 +11,8 @@ void i18n
     resources,
     fallbackLng: 'en',
     supportedLngs: ['en', 'zh'],
+    defaultNS: 'common',
+    ns: ['common'],
     interpolation: { escapeValue: false },
     detection: {
       order: ['navigator', 'localStorage'],

@@ -1,54 +1,58 @@
-import { Layout, Menu, Typography } from 'antd';
-import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import LocaleProvider from './antd/LocaleProvider';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import ConsoleShellPage from './pages/ConsoleShellPage';
 import LoginPage from './pages/LoginPage';
-
-const { Header, Content } = Layout;
+import {
+  ChangePasswordGate,
+  LoginGate,
+  RequireAuth,
+  RequirePasswordChange,
+} from './router/guards';
 
 export default function App() {
   return (
     <LocaleProvider>
       <BrowserRouter>
-        <Shell />
+        <AppRoutes />
       </BrowserRouter>
     </LocaleProvider>
   );
 }
 
-function Shell() {
-  const { t } = useTranslation();
-
-  const items = [
-    { key: 'login', label: <Link to="/login">{t('nav.login')}</Link> },
-    {
-      key: 'change-password',
-      label: <Link to="/change-password">{t('nav.changePassword')}</Link>,
-    },
-    { key: 'console', label: <Link to="/console">{t('nav.console')}</Link> },
-  ];
-
+/** Route wiring, router-agnostic so tests can mount it under a MemoryRouter. */
+export function AppRoutes() {
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-        <Typography.Title
-          level={4}
-          style={{ color: '#fff', margin: 0, whiteSpace: 'nowrap' }}
-        >
-          {t('app.name')}
-        </Typography.Title>
-        <Menu theme="dark" mode="horizontal" items={items} style={{ flex: 1, minWidth: 0 }} />
-      </Header>
-      <Content style={{ padding: 24 }}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/change-password" element={<ChangePasswordPage />} />
-          <Route path="/console" element={<ConsoleShellPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Content>
-    </Layout>
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          <LoginGate>
+            <LoginPage />
+          </LoginGate>
+        }
+      />
+      <Route
+        path="/change-password"
+        element={
+          <RequireAuth>
+            <ChangePasswordGate>
+              <ChangePasswordPage />
+            </ChangePasswordGate>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <RequirePasswordChange>
+              <ConsoleShellPage />
+            </RequirePasswordChange>
+          </RequireAuth>
+        }
+      />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }

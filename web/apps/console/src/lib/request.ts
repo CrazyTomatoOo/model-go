@@ -2,11 +2,13 @@ import { getCsrfToken } from './auth';
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -21,21 +23,38 @@ type JsonObject = Record<string, unknown>;
 async function readError(response: Response): Promise<ApiError> {
   const raw = await response.text();
   let message: string | null = null;
+  let code: string | null = null;
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
-      if (
-        typeof parsed === 'object' &&
-        parsed !== null &&
-        typeof (parsed as JsonObject).message === 'string'
-      ) {
-        message = (parsed as JsonObject).message as string;
+      if (typeof parsed === 'object' && parsed !== null) {
+        const obj = parsed as JsonObject;
+        if (typeof obj.message === 'string') {
+          message = obj.message;
+        }
+        if (typeof obj.code === 'string') {
+          code = obj.code;
+        }
       }
     } catch {
       // non-JSON error body; fall back to the generic message below
     }
   }
-  return new ApiError(response.status, message ?? `Request failed: ${response.status}`);
+  return new ApiError(response.status, message ?? `Request failed: ${response.status}`, code);
+}
+
+/**
+ * Auth-level failures that invalidate the whole session are forwarded to a
+ * single global handler (registered by AuthProvider) before the rejection is
+ * thrown: SESSION_EXPIRED logs the user out, PASSWORD_CHANGE_REQUIRED sends
+ * them to the forced password change page.
+ */
+export type GlobalErrorHandler = (error: ApiError, path: string) => void;
+
+let onGlobalError: GlobalErrorHandler | null = null;
+
+export function setOnGlobalError(handler: GlobalErrorHandler | null): void {
+  onGlobalError = handler;
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -58,7 +77,16 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   });
 
   if (!response.ok) {
-    throw await readError(response);
+    const error = await readError(response);
+    if (error.code === 'SESSION_EXPIRED' || error.code === 'PASSWORD_CHANGE_REQUIRED') {
+      onGlobalError?.(error, path);
+    }
+    throw error;
+  }
+
+  // 204 (e.g. POST /auth/logout) carries no body.
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;
