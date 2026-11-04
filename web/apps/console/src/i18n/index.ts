@@ -9,6 +9,7 @@ void i18n
   .use(initReactI18next)
   .init({
     resources,
+    defaultNS: 'common',
     fallbackLng: 'en',
     supportedLngs: ['en', 'zh'],
     interpolation: { escapeValue: false },
