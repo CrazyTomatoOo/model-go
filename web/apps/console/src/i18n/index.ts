@@ -12,7 +12,6 @@ void i18n
     defaultNS: 'common',
     fallbackLng: 'en',
     supportedLngs: ['en', 'zh'],
-    defaultNS: 'common',
     ns: ['common'],
     interpolation: { escapeValue: false },
     detection: {
