@@ -66,3 +66,34 @@ jobs:
 
       - name: go test
         run: go test ./... -count=1 -timeout 15m
+
+  frontend:
+    name: web console (install + lint + test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter @model-go/console lint
+
+      - name: Test
+        run: pnpm --filter @model-go/console test
+
+      - name: Build
+        run: pnpm --filter @model-go/console build
