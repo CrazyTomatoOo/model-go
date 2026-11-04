@@ -14,9 +14,8 @@ export default function ConsoleShellPage() {
 
   const handleLogout = async () => {
     try {
-      await apiFetch('/auth/logout', { method: 'POST' });
+      await apiFetch('/api/v1/auth/logout', { method: 'POST' });
     } finally {
-      // The user's intent is to leave; complete it even if the call fails.
       clearUser();
       navigate('/login', { replace: true });
     }

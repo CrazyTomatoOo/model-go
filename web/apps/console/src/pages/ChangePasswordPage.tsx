@@ -2,6 +2,7 @@ import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../auth/AuthProvider';
 import {
   ChangePasswordError,
   changePassword,
@@ -23,6 +24,7 @@ const ERROR_KEYS: Record<ChangePasswordErrorCode, string> = {
 
 export default function ChangePasswordPage() {
   const { t } = useTranslation();
+  const { setUser } = useAuth();
   const navigate = useNavigate();
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -32,6 +34,9 @@ export default function ChangePasswordPage() {
     setSubmitting(true);
     try {
       await changePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword });
+      // The backend cleared must_change_password on success; mirror it in the
+      // context so RequirePasswordChange no longer bounces back.
+      setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
       navigate('/');
     } catch (error) {
       setErrorKey(

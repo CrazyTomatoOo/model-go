@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { AuthProvider } from '../auth/AuthProvider';
 import { setCsrfToken } from '../lib/auth';
 import '../i18n';
 import LoginPage from './LoginPage';
@@ -8,11 +9,13 @@ import LoginPage from './LoginPage';
 function renderLoginPage() {
   render(
     <MemoryRouter initialEntries={['/login']}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/change-password" element={<div>CHANGE_PASSWORD_LANDING</div>} />
-        <Route path="/" element={<div>ROOT_LANDING</div>} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/change-password" element={<div>CHANGE_PASSWORD_LANDING</div>} />
+          <Route path="/" element={<div>ROOT_LANDING</div>} />
+        </Routes>
+      </AuthProvider>
     </MemoryRouter>,
   );
 }
@@ -33,6 +36,31 @@ function okBody(mustChangePassword: boolean): string {
       must_change_password: mustChangePassword,
     },
     csrf_token: 'tok-abc',
+  });
+}
+
+/**
+ * Routes the fetch mock the way the app talks to the backend: the AuthProvider
+ * bootstrap GET /auth/me has no session, and POST /auth/login answers through
+ * the provided responder.
+ */
+function stubAuthRoutes(loginResponse?: () => Response): ReturnType<typeof vi.fn> {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(input);
+    const method = (init?.method ?? 'GET').toUpperCase();
+    if (method === 'GET' && path === '/api/v1/auth/me') {
+      return new Response(JSON.stringify({ code: 'SESSION_EXPIRED', message: 'no session' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (method === 'POST' && path === '/api/v1/auth/login') {
+      if (loginResponse === undefined) {
+        throw new Error('unexpected login call');
+      }
+      return loginResponse();
+    }
+    throw new Error(`unexpected fetch: ${method} ${path}`);
   });
 }
 
@@ -76,9 +104,7 @@ describe('LoginPage', () => {
   });
 
   it('validates empty fields locally without calling the API', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      throw new Error('unexpected fetch call');
-    });
+    const fetchMock = stubAuthRoutes();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     renderLoginPage();
 
@@ -86,21 +112,29 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText('Username is required')).toBeTruthy();
     expect(await screen.findByText('Password is required')).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+    const loginCalls = fetchMock.mock.calls.filter(
+      ([input]) => String(input) === '/api/v1/auth/login',
+    );
+    expect(loginCalls).toHaveLength(0);
   });
 
   it('POSTs /api/v1/auth/login with the JSON credentials on valid submit', async () => {
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(okBody(false), { status: 200 }),
-    );
+    const fetchMock = stubAuthRoutes(() => new Response(okBody(false), { status: 200 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     renderLoginPage();
 
     fillAndSubmit('alice', 'secret');
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const [input, init] = fetchMock.mock.calls[0];
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input]) => String(input) === '/api/v1/auth/login'),
+      ).toBe(true);
+    });
+    const loginCall = fetchMock.mock.calls.find(
+      ([input]) => String(input) === '/api/v1/auth/login',
+    );
+    expect(loginCall).toBeDefined();
+    const [input, init] = loginCall as [RequestInfo | URL, RequestInit];
     expect(String(input)).toBe('/api/v1/auth/login');
     expect(init).toMatchObject({
       method: 'POST',
@@ -110,7 +144,7 @@ describe('LoginPage', () => {
   });
 
   it('redirects to /change-password when must_change_password is true', async () => {
-    globalThis.fetch = (async () => new Response(okBody(true), { status: 200 })) as typeof fetch;
+    globalThis.fetch = stubAuthRoutes(() => new Response(okBody(true), { status: 200 })) as unknown as typeof fetch;
     renderLoginPage();
 
     fillAndSubmit('alice', 'secret');
@@ -119,7 +153,7 @@ describe('LoginPage', () => {
   });
 
   it('redirects to / when must_change_password is false', async () => {
-    globalThis.fetch = (async () => new Response(okBody(false), { status: 200 })) as typeof fetch;
+    globalThis.fetch = stubAuthRoutes(() => new Response(okBody(false), { status: 200 })) as unknown as typeof fetch;
     renderLoginPage();
 
     fillAndSubmit('alice', 'secret');
@@ -134,8 +168,12 @@ describe('LoginPage', () => {
     ['ACCOUNT_LOCKED', 403, 'Too many failed login attempts, account locked for 15 minutes'],
     ['RATE_LIMITED', 429, 'Too many requests, please try again later'],
   ])('shows the mapped copy for the %s error', async (code, status, copy) => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ code, message: 'server message' }), { status })) as typeof fetch;
+    globalThis.fetch = stubAuthRoutes(
+      () =>
+        new Response(JSON.stringify({ code, message: 'server message' }), {
+          status,
+        }),
+    ) as unknown as typeof fetch;
     renderLoginPage();
 
     fillAndSubmit('alice', 'secret');
@@ -144,9 +182,9 @@ describe('LoginPage', () => {
   });
 
   it('shows the network error copy when the request cannot reach the server', async () => {
-    globalThis.fetch = (async () => {
+    globalThis.fetch = stubAuthRoutes(() => {
       throw new TypeError('fetch failed');
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
     renderLoginPage();
 
     fillAndSubmit('alice', 'secret');

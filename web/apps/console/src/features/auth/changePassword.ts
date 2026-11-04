@@ -26,14 +26,16 @@ export async function changePassword(payload: ChangePasswordPayload): Promise<vo
       body: { old_password: payload.oldPassword, new_password: payload.newPassword },
     });
   } catch (error) {
-    // apiFetch (lib/request.ts) parses the response body unconditionally. The password
-    // endpoint answers 204 with an empty body (login-design spec §4.1), which surfaces
-    // here as a SyntaxError and means the change succeeded. The wrapper is frozen, so
-    // the normalization lives in this module.
-    if (error instanceof SyntaxError) return;
+    // Backend contract (spec §4.5): a wrong old password and a policy
+    // violation are both 400 VALIDATION_ERROR, distinguished by
+    // errors[].field (old_password vs new_password). 401 on this endpoint is
+    // SESSION_EXPIRED, handled globally by apiFetch.
     if (error instanceof ApiError) {
-      if (error.status === 401) throw new ChangePasswordError('invalidInitialPassword');
-      if (error.status === 400) throw new ChangePasswordError('policyViolation');
+      if (error.code === 'VALIDATION_ERROR') {
+        const field = error.errors?.[0]?.field;
+        if (field === 'old_password') throw new ChangePasswordError('invalidInitialPassword');
+        if (field === 'new_password') throw new ChangePasswordError('policyViolation');
+      }
       throw new ChangePasswordError('unknown');
     }
     // Transport-level failure (connection, DNS, timeout): no HTTP status involved.
