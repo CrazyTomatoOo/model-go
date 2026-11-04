@@ -9,6 +9,8 @@ export const resources = {
       'login.username': 'Username',
       'login.password': 'Password',
       'login.submit': 'Sign in',
+      'login.usernameRequired': 'Username is required',
+      'login.passwordRequired': 'Password is required',
       'changePassword.title': 'First sign-in: change your password',
       'changePassword.oldPassword': 'Initial Password',
       'changePassword.newPassword': 'New Password',
@@ -28,6 +30,14 @@ export const resources = {
       'shell.logout': 'Log out',
       'shell.placeholder': 'Signed in. The workspace arrives in a later iteration.',
     },
+    errors: {
+      INVALID_CREDENTIALS: 'Incorrect username or password',
+      ACCOUNT_PENDING: 'Account is pending approval by a security administrator',
+      ACCOUNT_DISABLED: 'Account is disabled, contact the administrator',
+      ACCOUNT_LOCKED: 'Too many failed login attempts, account locked for 15 minutes',
+      RATE_LIMITED: 'Too many requests, please try again later',
+      NETWORK_ERROR: 'Network error, please try again later',
+    },
   },
   zh: {
     common: {
@@ -39,6 +49,8 @@ export const resources = {
       'login.username': '用户名',
       'login.password': '密码',
       'login.submit': '登录',
+      'login.usernameRequired': '请输入用户名',
+      'login.passwordRequired': '请输入密码',
       'changePassword.title': '首次登录，请修改密码',
       'changePassword.oldPassword': '初始密码',
       'changePassword.newPassword': '新密码',
@@ -56,6 +68,14 @@ export const resources = {
       'console.hello': '欢迎使用 ModelGo 控制台。',
       'shell.logout': '退出登录',
       'shell.placeholder': '工作台待后续迭代',
+    },
+    errors: {
+      INVALID_CREDENTIALS: '用户名或密码错误',
+      ACCOUNT_PENDING: '账号待安全管理员审核启用',
+      ACCOUNT_DISABLED: '账号已停用，请联系管理员',
+      ACCOUNT_LOCKED: '登录失败次数过多，账号已锁定，请 15 分钟后再试',
+      RATE_LIMITED: '操作过于频繁，请稍后再试',
+      NETWORK_ERROR: '网络异常，请稍后重试',
     },
   },
 };
