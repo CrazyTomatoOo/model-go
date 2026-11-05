@@ -11,14 +11,7 @@ import {
 } from 'react';
 import { setCsrfToken } from '../lib/auth';
 import { apiFetch, setOnGlobalError } from '../lib/request';
-
-export type ConsoleUser = {
-  id: number;
-  username: string;
-  role: 'user' | 'sysadmin' | 'secadmin' | 'auditadmin';
-  status: 'pending' | 'active' | 'disabled';
-  must_change_password: boolean;
-};
+import type { ConsoleUser } from './types';
 
 type MeResponse = {
   user: ConsoleUser;

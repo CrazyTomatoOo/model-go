@@ -1,7 +1,6 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import LocaleProvider from './antd/LocaleProvider';
-import ChangePasswordPage from './pages/ChangePasswordPage';
-import ConsoleShellPage from './pages/ConsoleShellPage';
 import LoginPage from './pages/LoginPage';
 import {
   ChangePasswordGate,
@@ -9,6 +8,10 @@ import {
   RequireAuth,
   RequirePasswordChange,
 } from './router/guards';
+
+// 重页面走 dynamic import，避免全量进入首屏 bundle（issue #22）
+const ConsoleShellPage = lazy(() => import('./pages/ConsoleShellPage'));
+const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
 
 export default function App() {
   return (
@@ -23,7 +26,8 @@ export default function App() {
 /** Route wiring, router-agnostic so tests can mount it under a MemoryRouter. */
 export function AppRoutes() {
   return (
-    <Routes>
+    <Suspense fallback={null}>
+      <Routes>
       <Route
         path="/login"
         element={
@@ -53,6 +57,7 @@ export function AppRoutes() {
         }
       />
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

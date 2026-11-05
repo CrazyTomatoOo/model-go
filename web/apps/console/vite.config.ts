@@ -9,5 +9,5 @@ export default defineConfig({
       '/api': { target: 'http://127.0.0.1:8080', changeOrigin: true },
     },
   },
-  test: { environment: 'jsdom', globals: false },
+  test: { environment: 'jsdom', globals: false, exclude: ['e2e/**', 'node_modules/**'] },
 });

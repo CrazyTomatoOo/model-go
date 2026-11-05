@@ -1,11 +1,8 @@
 import { getCsrfToken, setCsrfToken } from '../../lib/auth';
-import type { ConsoleUser } from '../../auth/AuthProvider';
-
-/** Shape of the user returned by POST /auth/login; identical to ConsoleUser. */
-export type LoginUser = ConsoleUser;
+import type { ConsoleUser } from '../../auth/types';
 
 export type LoginResponse = {
-  user: LoginUser;
+  user: ConsoleUser;
   csrf_token: string;
 };
 
