@@ -1,0 +1,108 @@
+name: console-e2e
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'cmd/**'
+      - 'internal/**'
+      - '.github/workflows/console-e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'cmd/**'
+      - 'internal/**'
+      - '.github/workflows/console-e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: console login E2E (playwright + real apiserver)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mg
+          POSTGRES_PASSWORD: mgpass
+          POSTGRES_DB: modelgo
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U mg -d modelgo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.3'
+          cache: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Build apiserver
+        run: go build -o /tmp/apiserver ./cmd/apiserver
+
+      - name: Bootstrap the three admin accounts
+        run: |
+          script -qec "MODELGO_POSTGRES_DSN='postgres://mg:mgpass@127.0.0.1:55432/modelgo?sslmode=disable' /tmp/apiserver admin bootstrap" /dev/null <<'EOF'
+          Bootstrap@Passw0rd
+          Bootstrap@Passw0rd
+          Bootstrap@Passw0rd
+          EOF
+
+      - name: Start apiserver
+        run: |
+          MODELGO_POSTGRES_DSN='postgres://mg:mgpass@127.0.0.1:55432/modelgo?sslmode=disable' \
+          MODELGO_REDIS_ADDR='127.0.0.1:56379' \
+          MODELGO_HTTP_ADDR=':8080' \
+          /tmp/apiserver serve &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/v1/auth/me >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Install playwright chromium
+        working-directory: web
+        run: pnpm --filter @model-go/console exec playwright install --with-deps chromium
+
+      - name: Run E2E
+        working-directory: web/apps/console
+        env:
+          E2E_OLD_PASSWORD: Bootstrap@Passw0rd
+          E2E_NEW_PASSWORD: E2E@Strong#2026
+        run: pnpm exec playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: web/apps/console/playwright-report
+          retention-days: 7

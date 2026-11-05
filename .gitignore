@@ -8,3 +8,8 @@ dist/
 
 # Logs
 *.log
+
+# Playwright (console E2E, issue #22)
+test-results/
+playwright-report/
+e2e-artifacts/
