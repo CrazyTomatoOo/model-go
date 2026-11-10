@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Form, Input, Typography } from 'antd';
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
@@ -45,17 +45,20 @@ export default function ChangePasswordPage() {
       await changePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword });
       // The backend cleared must_change_password on success. Warm the shell
       // chunk (same module App.tsx's lazy() resolves) while a loading
-      // surface stays painted. Order matters: navigate FIRST, then clear the
-      // flag, both in this same microtask so React batches them into one
-      // commit — /change-password unmounts outright instead of its
-      // ChangePasswordGate re-rendering <Navigate> (which renders null and
-      // paints one blank frame, #39 C13).
+      // surface stays painted. React Router wraps navigations in
+      // startTransition, so the flag clear must join the SAME transition —
+      // otherwise the sync setUser commits first and ChangePasswordGate
+      // renders <Navigate> (null) for one frame at the old location (#39 C13,
+      // verified with render marks: gate(flag=false, /change-password) then a
+      // separate '/' commit).
       setLeaving(true);
       import('./ConsoleShellPage')
         .catch(() => undefined)
         .finally(() => {
-          navigate('/', { replace: true });
-          setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
+          startTransition(() => {
+            navigate('/', { replace: true });
+            setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
+          });
         });
     } catch (error) {
       if (error instanceof ChangePasswordError) {
