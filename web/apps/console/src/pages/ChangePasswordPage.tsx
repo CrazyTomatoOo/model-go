@@ -8,6 +8,7 @@ import {
   changePassword,
   type ChangePasswordErrorCode,
 } from '../features/auth/changePassword';
+import PasswordPolicyList from '../features/auth/PasswordPolicyList';
 
 type ChangePasswordFormValues = {
   oldPassword: string;
@@ -52,8 +53,8 @@ export default function ChangePasswordPage() {
 
   return (
     <Card style={{ maxWidth: 420, margin: '0 auto' }}>
-      <Typography.Title level={3}>{t('changePassword.title')}</Typography.Title>
-      <Form layout="vertical" onFinish={onFinish}>
+      <Typography.Title level={1}>{t('changePassword.title')}</Typography.Title>
+      <Form layout="vertical" onFinish={onFinish} onValuesChange={() => setErrorKey(null)}>
         <Form.Item
           label={t('changePassword.oldPassword')}
           name="oldPassword"
@@ -64,7 +65,7 @@ export default function ChangePasswordPage() {
         <Form.Item
           label={t('changePassword.newPassword')}
           name="newPassword"
-          extra={t('changePassword.policyHint')}
+          extra={<PasswordPolicyList />}
           rules={[{ required: true, message: t('changePassword.errors.required') }]}
         >
           <Input.Password autoComplete="new-password" />
@@ -88,7 +89,14 @@ export default function ChangePasswordPage() {
           <Input.Password autoComplete="new-password" />
         </Form.Item>
         {errorKey !== null && (
-          <Alert type="error" showIcon message={t(errorKey)} style={{ marginBottom: 16 }} />
+          <Alert
+            type="error"
+            showIcon
+            message={t(errorKey)}
+            closable
+            onClose={() => setErrorKey(null)}
+            style={{ marginBottom: 16 }}
+          />
         )}
         <Button type="primary" htmlType="submit" block loading={submitting}>
           {t('changePassword.submit')}

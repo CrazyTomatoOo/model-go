@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { LoginError, login, type LoginErrorCode } from '../features/auth/login';
+import useCountdown from '../lib/useCountdown';
 import { useAuth } from '../auth/AuthProvider';
 import './LoginPage.css';
 
@@ -45,18 +46,17 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ code: LoginErrorCode; stamp: number } | null>(null);
-  const [cooldownLeft, setCooldownLeft] = useState(0);
-  const cooldownActive = cooldownLeft > 0;
+  const [cooldownWindow, setCooldownWindow] = useState<number | null>(null);
+  const cooldownLeft = useCountdown(cooldownWindow);
+  const cooldownActive = cooldownWindow !== null && cooldownLeft > 0;
 
+  // Route the window back through null at expiry so a later 429 with the
+  // same retry window re-arms the countdown instead of staying at 0.
   useEffect(() => {
-    if (!cooldownActive) {
-      return;
+    if (cooldownWindow !== null && cooldownLeft === 0) {
+      setCooldownWindow(null);
     }
-    const timer = window.setInterval(() => {
-      setCooldownLeft((left) => Math.max(0, left - 1));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [cooldownActive]);
+  }, [cooldownWindow, cooldownLeft]);
 
   const handleSubmit = async (values: LoginFormValues) => {
     // Enter key in a field still fires form submit; never hit the API while
@@ -73,10 +73,13 @@ export default function LoginPage() {
       setUser(res.user);
       navigate(res.user.must_change_password ? '/change-password' : '/');
     } catch (err) {
-      const code = err instanceof LoginError ? err.code : 'NETWORK_ERROR';
+      const loginError = err instanceof LoginError ? err : null;
+      const code = loginError?.code ?? 'NETWORK_ERROR';
       setError({ code, stamp: Date.now() });
       if (code === 'RATE_LIMITED') {
-        setCooldownLeft(RATE_LIMIT_COOLDOWN_SECONDS);
+        // The contract's retry_after_seconds / Retry-After wins over the
+        // fixed fallback whenever the backend provides it.
+        setCooldownWindow(loginError?.retryAfterSeconds ?? RATE_LIMIT_COOLDOWN_SECONDS);
       }
     } finally {
       setSubmitting(false);
@@ -92,9 +95,7 @@ export default function LoginPage() {
     <div className="login-page">
       <aside className="login-brand">
         <div className="login-brand-inner">
-          <Typography.Title level={2} className="login-brand-title">
-            {t('login.welcome')}
-          </Typography.Title>
+          <h1 className="login-brand-title">{t('login.welcome')}</h1>
           <Typography.Paragraph className="login-brand-tagline">
             {t('login.subtitle')}
           </Typography.Paragraph>
@@ -103,13 +104,13 @@ export default function LoginPage() {
       <main className="login-panel">
         <div className="login-form-wrap">
           <Typography.Title level={3}>{t('login.title')}</Typography.Title>
-          <Form layout="vertical" onFinish={handleSubmit}>
+          <Form layout="vertical" onFinish={handleSubmit} onValuesChange={() => setError(null)}>
             <Form.Item
               label={t('login.username')}
               name="username"
               rules={[{ required: true, message: t('login.usernameRequired') }]}
             >
-              <Input autoComplete="username" />
+              <Input autoComplete="username" autoFocus />
             </Form.Item>
             <Form.Item
               label={t('login.password')}
@@ -123,7 +124,13 @@ export default function LoginPage() {
                 key={error.stamp}
                 className={SHAKEN_CODES.includes(error.code) ? 'login-error-shake' : undefined}
               >
-                <Alert type="error" showIcon message={errorMessage(error.code)} />
+                <Alert
+                  type="error"
+                  showIcon
+                  message={errorMessage(error.code)}
+                  closable={error.code !== 'RATE_LIMITED'}
+                  onClose={() => setError(null)}
+                />
               </div>
             )}
             <Button
@@ -137,17 +144,6 @@ export default function LoginPage() {
             </Button>
           </Form>
         </div>
-        <footer className="login-footer">
-          {/* The legal page ships with the website track; the footer reserves
-              the slot so the URL lands without a console change. */}
-          <a className="login-footer-link" href="#privacy" onClick={(e) => e.preventDefault()}>
-            {t('login.footer.privacy')}
-          </a>
-          <span className="login-footer-divider" aria-hidden="true" />
-          <Typography.Text type="secondary" className="login-footer-icp">
-            {t('login.footer.icp')}
-          </Typography.Text>
-        </footer>
       </main>
     </div>
   );

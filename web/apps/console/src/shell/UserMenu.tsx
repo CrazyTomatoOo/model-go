@@ -38,10 +38,12 @@ export default function UserMenu() {
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      // Best effort: even if the request fails, the local session is cleared
-      // and the visitor lands on /login (same contract as before #36).
       try {
         await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+      } catch {
+        // Best effort: even when the request fails, the local session is
+        // cleared below and the visitor lands on /login (same contract as
+        // before #36) — without a floating unhandled rejection.
       } finally {
         clearUser();
         setConfirmOpen(false);

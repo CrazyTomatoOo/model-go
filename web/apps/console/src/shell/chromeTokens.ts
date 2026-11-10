@@ -17,8 +17,6 @@ export const chromeInk = {
   hover: 'rgba(255, 255, 255, 0.12)',
   /** Selected/active wash, one step above hover. */
   active: 'rgba(255, 255, 255, 0.22)',
-  /** Hairline between chrome regions (drawer header, drawer actions). */
-  hairline: 'rgba(255, 255, 255, 0.25)',
 } as const;
 
 /**

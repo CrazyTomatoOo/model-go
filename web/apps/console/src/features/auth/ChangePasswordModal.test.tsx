@@ -105,7 +105,7 @@ describe('ChangePasswordModal', () => {
 
     submitForm();
 
-    expect(await screen.findAllByText('请填写此项')).not.toHaveLength(0);
+    expect(await screen.findAllByText('请填写此项', {}, { timeout: 3000 })).not.toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

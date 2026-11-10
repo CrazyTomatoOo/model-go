@@ -15,10 +15,19 @@ void i18n
     ns: ['common', 'overview'],
     interpolation: { escapeValue: false },
     detection: {
-      order: ['navigator', 'localStorage'],
+      // The saved choice beats the OS/browser locale on reload (#37).
+      order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
       lookupLocalStorage: STORAGE_KEY,
     },
   });
+
+// <html lang> must follow the resolved language so assistive tech reads the
+// page with the right voice (#37).
+const syncDocumentLang = (lng: string) => {
+  document.documentElement.lang = lng;
+};
+syncDocumentLang(i18n.resolvedLanguage ?? i18n.language);
+i18n.on('languageChanged', syncDocumentLang);
 
 export default i18n;

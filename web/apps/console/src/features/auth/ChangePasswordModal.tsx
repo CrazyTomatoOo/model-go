@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../auth/AuthProvider';
 import { ChangePasswordError, changePassword } from './changePassword';
 import { passwordPolicyIssue } from './passwordPolicy';
+import useCountdown from '../../lib/useCountdown';
+import PasswordPolicyList from './PasswordPolicyList';
 
 type ChangePasswordModalProps = {
   open: boolean;
@@ -54,23 +56,15 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
     };
   }, []);
 
-  // Countdown for the rate-limited state: re-render each second, clear the
-  // alert at zero so the submit button unlocks.
-  const countdownActive = alert !== null && alert.seconds !== null && alert.seconds > 0;
+  const countdownLeft = useCountdown(alert?.seconds ?? null);
+  const countdownActive = alert !== null && alert.seconds !== null && countdownLeft > 0;
+
+  // At zero the rate-limit alert lifts itself so the submit button unlocks.
   useEffect(() => {
-    if (!countdownActive) {
-      return;
+    if (alert !== null && alert.seconds !== null && countdownLeft === 0) {
+      setAlert(null);
     }
-    const id = setInterval(() => {
-      setAlert((prev) => {
-        if (prev === null || prev.seconds === null || prev.seconds <= 1) {
-          return null;
-        }
-        return { ...prev, seconds: prev.seconds - 1 };
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [countdownActive, alert?.seconds]);
+  }, [alert, countdownLeft]);
 
   const resetState = () => {
     if (successTimer.current !== null) {
@@ -186,7 +180,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
           <Form.Item
             label={t('changePassword.modal.newPassword')}
             name="newPassword"
-            extra={t('changePassword.policyHint')}
+            extra={<PasswordPolicyList />}
             rules={[
               { required: true, message: t('changePassword.errors.required') },
               {
@@ -233,7 +227,9 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
               <Alert
                 type="error"
                 showIcon
-                message={t(alert.key, { seconds: alert.seconds ?? 0 })}
+                message={t(alert.key, { seconds: countdownLeft })}
+                closable={alert.seconds === null}
+                onClose={() => setAlert(null)}
               />
             </Form.Item>
           )}

@@ -14,14 +14,16 @@ export const resources = {
       'login.usernameRequired': 'Username is required',
       'login.passwordRequired': 'Password is required',
       'login.rateLimited': 'Too many requests. Please try again in {{seconds}}s',
-      'login.footer.privacy': 'Privacy Policy',
-      'login.footer.icp': '京ICP备2026000000号-1',
       'changePassword.title': 'First sign-in: change your password',
       'changePassword.oldPassword': 'Initial Password',
       'changePassword.newPassword': 'New Password',
       'changePassword.confirmPassword': 'Confirm New Password',
-      'changePassword.policyHint':
-        'At least 12 characters (12 if it combines at least two of upper/lowercase, digits and symbols; 16+ for a single class). Must not equal or contain the username. No common weak passwords. Must differ from the current password and the last 5 historical passwords.',
+      'changePassword.policyList.lengthClasses':
+        'At least 12 characters (12 with two or more of upper/lowercase, digits and symbols; 16+ for a single class); Unicode supported',
+      'changePassword.policyList.exclusions':
+        'Must not equal or contain your username; common weak passwords are rejected',
+      'changePassword.policyList.history':
+        'Must differ from the current password and the 5 most recent passwords',
       'changePassword.submit': 'Confirm Change',
       'changePassword.errors.required': 'This field is required',
       'changePassword.errors.confirmMismatch': 'The new passwords do not match',
@@ -109,14 +111,14 @@ export const resources = {
       'login.usernameRequired': '请输入用户名',
       'login.passwordRequired': '请输入密码',
       'login.rateLimited': '操作过于频繁，请 {{seconds}} 秒后重试',
-      'login.footer.privacy': '隐私政策',
-      'login.footer.icp': '京ICP备2026000000号-1',
       'changePassword.title': '首次登录，请修改密码',
       'changePassword.oldPassword': '初始密码',
       'changePassword.newPassword': '新密码',
       'changePassword.confirmPassword': '确认新密码',
-      'changePassword.policyHint':
-        '至少 12 位（含大写/小写/数字/符号中至少两类时 12 位起，纯单类需 16 位以上）；不得与用户名相同或包含用户名；不使用常见弱口令；不得与当前密码及最近 5 次历史密码相同。',
+      'changePassword.policyList.lengthClasses':
+        '至少 12 位（含大写/小写/数字/符号中至少两类时 12 位起，纯单类需 16 位以上），支持 Unicode 字符',
+      'changePassword.policyList.exclusions': '不得与用户名相同或包含用户名，不使用常见弱口令',
+      'changePassword.policyList.history': '不得与当前密码及最近 5 次历史密码相同',
       'changePassword.submit': '确认修改',
       'changePassword.errors.required': '请填写此项',
       'changePassword.errors.confirmMismatch': '两次输入的新密码不一致',

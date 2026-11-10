@@ -3,16 +3,6 @@ import { expect, signedInMe, test } from './fixtures';
 // #34 T2 登录页产品化：提交加载态、错误 shake + 限流倒计时、403/404 页。
 // 全部走网络层拦截的 auth stubs（见 fixtures.ts），无需真实 apiserver。
 
-// The fixtures' authMocks default is one shared object per module instance,
-// and this worker-sequential run lets the FIRST test of the next spec file
-// execute on THIS file's registry. Mutations must not outlive their test —
-// a leftover signed-in /auth/me override would render the shell instead of
-// the login page in the next spec (observed against smoke.spec's first test).
-test.afterEach(({ authMocks }) => {
-  authMocks.me = undefined;
-  authMocks.login = undefined;
-});
-
 test('submit button spins and disables while the login request is in flight', async ({
   page,
   authMocks,
@@ -36,10 +26,29 @@ test('submit button spins and disables while the login request is in flight', as
   await expect(submit).toHaveClass(/ant-btn-loading/);
   await expect(submit.locator('.ant-btn-loading-icon')).toBeVisible();
 
-  // Once the stub answers, the copy keyed by the backend code appears.
-  await expect(page.getByText('用户名或密码错误')).toBeVisible();
+  // Once the stub answers, the copy keyed by the backend code appears. The
+  // failure is a live region (#34): role=alert, closable, and cleared by
+  // typing in any field.
+  const alertBox = page.getByRole('alert');
+  await expect(alertBox).toContainText('用户名或密码错误');
+  await alertBox.getByRole('button', { name: 'close' }).click();
+  await expect(alertBox).toBeHidden();
+
+  // A resubmitted error reappears; editing any field clears it.
+  await submit.click();
+  await expect(alertBox).toBeVisible();
+  await page.getByLabel('用户名').fill('sysadmin-again');
+  await expect(alertBox).toBeHidden();
   await expect(submit).not.toHaveClass(/ant-btn-loading/);
   await expect(submit).toBeEnabled();
+});
+
+test('login page keeps a single h1 and autofocuses the username field', async ({
+  page,
+}) => {
+  await page.goto('/login');
+  await expect(page.locator('h1')).toHaveCount(1);
+  await expect(page.getByLabel('用户名')).toBeFocused();
 });
 
 test('rate-limited login shakes the error and shows a retry countdown', async ({

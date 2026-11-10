@@ -72,6 +72,30 @@ test('document.title refreshes when the language toggles, without navigation', a
   await expect(page).toHaveTitle('控制台总览 · ModelGo 控制台');
 });
 
+test('language choice syncs <html lang> and persists across reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // Seed the saved choice so the initial language is deterministic even
+  // though the headless browser reports an en-US navigator locale. Init
+  // scripts re-run on reload, so only seed when nothing is stored — the
+  // toggle's own write must survive the reload this test asserts.
+  await page.addInitScript((key) => {
+    if (window.localStorage.getItem(key) === null) {
+      window.localStorage.setItem(key, 'zh');
+    }
+  }, 'model-go-console-locale');
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh');
+
+  await page.getByRole('radiogroup', { name: '语言' }).getByText('EN', { exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page).toHaveTitle('Console Overview · ModelGo Console');
+
+  // localStorage beats the navigator locale on reload (#37).
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByText('GPU Accelerators', { exact: true })).toBeVisible();
+});
+
 test('overview cards stack cleanly at a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
