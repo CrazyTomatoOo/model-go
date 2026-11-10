@@ -1,0 +1,80 @@
+name: model-go-preview
+
+# 本地预览：http://localhost:8080 ，sysadmin / Hub-dev#2026-a（首登强制改密；
+# 密码仅为本地预览，与 deploy/README 的 kind 联调值一致）。
+# bootstrap 每次 up 都跑但幂等：已有管理员时正常退出。
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: modelgo
+      POSTGRES_PASSWORD: modelgo
+      POSTGRES_DB: modelgo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U modelgo -d modelgo"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    # 预览用 tmpfs：down 即清库；要持久化改成卷
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    # apiserver 目前只支持无密码 Redis
+    command: ["redis-server", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  apiserver:
+    build:
+      context: .
+      dockerfile: docker/apiserver/Dockerfile
+      args:
+        GOPROXY: "https://goproxy.cn,direct"
+    command: ["serve"]
+    environment:
+      MODELGO_HTTP_ADDR: ":8080"
+      MODELGO_POSTGRES_DSN: postgres://modelgo:modelgo@postgres:5432/modelgo?sslmode=disable
+      MODELGO_REDIS_ADDR: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # admin bootstrap 自建连接并跑迁移（cmd/apiserver/admin.go），只依赖 PG；
+  # 密码经 term.ReadPassword（要 TTY），用 GNU script 伪 TTY 喂三行
+  bootstrap:
+    build:
+      context: .
+      dockerfile: docker/apiserver/Dockerfile
+      args:
+        GOPROXY: "https://goproxy.cn,direct"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MODELGO_POSTGRES_DSN: postgres://modelgo:modelgo@postgres:5432/modelgo?sslmode=disable
+      BOOTSTRAP_SYSADMIN_PW: Hub-dev#2026-a
+      BOOTSTRAP_SECADMIN_PW: Hub-dev#2026-b
+      BOOTSTRAP_AUDITADMIN_PW: Hub-dev#2026-c
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'printf "%s\n%s\n%s\n" "$$BOOTSTRAP_SYSADMIN_PW" "$$BOOTSTRAP_SECADMIN_PW" "$$BOOTSTRAP_AUDITADMIN_PW" | script -qec "stty -echo; apiserver admin bootstrap" /dev/null'
+
+  console:
+    build:
+      context: .
+      dockerfile: docker/console/Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+    environment:
+      BACKEND_URL: http://apiserver:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - apiserver
