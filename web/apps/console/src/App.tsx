@@ -1,8 +1,10 @@
 import { ConfigProvider } from 'antd';
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, Route, Routes } from 'react-router';
 import LocaleProvider from './antd/LocaleProvider';
 import LoginPage from './pages/LoginPage';
+import NotFoundPage from './pages/NotFoundPage';
+import ForbiddenPage from './pages/ForbiddenPage';
 import DocumentTitle from './router/DocumentTitle';
 import GuardLoading from './router/GuardLoading';
 import {
@@ -63,7 +65,11 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/403" element={<ForbiddenPage />} />
+      {/* Unknown routes render the 404 page instead of bouncing: deep links
+          to future routes get a real explanation, and the guards on `/`
+          still send unauthenticated visitors to /login. */}
+      <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );

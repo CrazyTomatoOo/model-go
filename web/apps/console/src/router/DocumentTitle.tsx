@@ -2,10 +2,14 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 import i18n from '../i18n';
 
-/** i18n copy keys per public route path. Unlisted paths keep the static title. */
+/**
+ * i18n copy keys per public route path. The 403 page has its own key; every
+ * other unlisted path renders NotFoundPage, so its title follows suit (#34).
+ */
 const ROUTE_TITLE_KEYS: Record<string, string> = {
   '/login': 'login.title',
   '/change-password': 'changePassword.title',
+  '/403': 'forbidden.title',
   '/': 'console.title',
 };
 
@@ -18,10 +22,8 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
 export default function DocumentTitle() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const key = ROUTE_TITLE_KEYS[pathname];
-    if (key !== undefined) {
-      document.title = `${i18n.t(key)} · ${i18n.t('app.name')}`;
-    }
+    const key = ROUTE_TITLE_KEYS[pathname] ?? 'notFound.title';
+    document.title = `${i18n.t(key)} · ${i18n.t('app.name')}`;
   }, [pathname]);
   return null;
 }
