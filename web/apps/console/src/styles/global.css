@@ -1,0 +1,45 @@
+/* Single global style entry (#33): document-level baselines only.
+   Component-level styles stay co-located with their components. */
+
+:root {
+  /* Dark wiring point (checklist B6): declare both schemes so native form
+     controls and scrollbars stay correct once dark ships; the palette
+     itself stays light for now. */
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  background-color: var(--ant-color-bg-layout, #f5f5f5);
+  font-family: var(
+    --ant-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    'Noto Sans',
+    sans-serif
+  );
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Checklist B5: dampen motion for users who prefer less. antd animations are
+   CSS transitions/animation under the same query, so this covers them too. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

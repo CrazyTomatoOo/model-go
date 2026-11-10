@@ -10,18 +10,22 @@ export class ApiError extends Error {
   readonly code: string | null;
   /** Field-level details carried by 400 VALIDATION_ERROR responses (§4.5). */
   readonly errors: FieldError[] | null;
+  /** Retry-After hint (seconds) from a 429 response, when the server sent one. */
+  readonly retryAfterSeconds: number | null;
 
   constructor(
     status: number,
     message: string,
     code: string | null = null,
     errors: FieldError[] | null = null,
+    retryAfterSeconds: number | null = null,
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.errors = errors;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -38,6 +42,11 @@ async function readError(response: Response): Promise<ApiError> {
   let message: string | null = null;
   let code: string | null = null;
   let errors: FieldError[] | null = null;
+  const retryAfterHeader = response.headers.get('retry-after');
+  const retryAfterSeconds =
+    retryAfterHeader !== null && /^\d+$/.test(retryAfterHeader)
+      ? Number.parseInt(retryAfterHeader, 10)
+      : null;
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -71,6 +80,7 @@ async function readError(response: Response): Promise<ApiError> {
     message ?? `Request failed: ${response.status}`,
     code,
     errors,
+    retryAfterSeconds,
   );
 }
 

@@ -1,32 +1,41 @@
+import { ConfigProvider } from 'antd';
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, Route, Routes } from 'react-router';
 import LocaleProvider from './antd/LocaleProvider';
 import LoginPage from './pages/LoginPage';
+import DocumentTitle from './router/DocumentTitle';
+import GuardLoading from './router/GuardLoading';
 import {
   ChangePasswordGate,
   LoginGate,
   RequireAuth,
   RequirePasswordChange,
 } from './router/guards';
+import { brandTheme } from './theme/brand';
 
 // 重页面走 dynamic import，避免全量进入首屏 bundle（issue #22）
 const ConsoleShellPage = lazy(() => import('./pages/ConsoleShellPage'));
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const ForbiddenPage = lazy(() => import('./pages/ForbiddenPage'));
 
 export default function App() {
   return (
-    <LocaleProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </LocaleProvider>
+    <ConfigProvider theme={brandTheme}>
+      <LocaleProvider>
+        <BrowserRouter>
+          <DocumentTitle />
+          <AppRoutes />
+        </BrowserRouter>
+      </LocaleProvider>
+    </ConfigProvider>
   );
 }
 
 /** Route wiring, router-agnostic so tests can mount it under a MemoryRouter. */
 export function AppRoutes() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<GuardLoading />}>
       <Routes>
       <Route
         path="/login"
@@ -56,7 +65,11 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/403" element={<ForbiddenPage />} />
+      {/* Unknown routes render the 404 page instead of bouncing: deep links
+          to future routes get a real explanation, and the guards on `/`
+          still send unauthenticated visitors to /login. */}
+      <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );

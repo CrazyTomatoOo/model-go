@@ -12,6 +12,7 @@ export type LoginErrorCode =
   | 'ACCOUNT_DISABLED'
   | 'ACCOUNT_LOCKED'
   | 'RATE_LIMITED'
+  | 'VALIDATION_ERROR'
   | 'NETWORK_ERROR';
 
 const LOGIN_ERROR_CODES: readonly LoginErrorCode[] = [
@@ -20,6 +21,7 @@ const LOGIN_ERROR_CODES: readonly LoginErrorCode[] = [
   'ACCOUNT_DISABLED',
   'ACCOUNT_LOCKED',
   'RATE_LIMITED',
+  'VALIDATION_ERROR',
   'NETWORK_ERROR',
 ];
 
@@ -29,11 +31,13 @@ function isLoginErrorCode(value: string): value is LoginErrorCode {
 
 export class LoginError extends Error {
   readonly code: LoginErrorCode;
+  readonly retryAfterSeconds: number | null;
 
-  constructor(code: LoginErrorCode, message: string) {
+  constructor(code: LoginErrorCode, message: string, retryAfterSeconds: number | null = null) {
     super(message);
     this.name = 'LoginError';
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -41,13 +45,15 @@ async function readLoginError(response: Response): Promise<LoginError> {
   const raw = await response.text();
   let code: LoginErrorCode = 'NETWORK_ERROR';
   let message = `Request failed: ${response.status}`;
+  let retryAfterSeconds: number | null = null;
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
       if (typeof parsed === 'object' && parsed !== null) {
-        const { code: bodyCode, message: bodyMessage } = parsed as {
+        const { code: bodyCode, message: bodyMessage, retry_after_seconds: bodyRetry } = parsed as {
           code?: unknown;
           message?: unknown;
+          retry_after_seconds?: unknown;
         };
         if (typeof bodyCode === 'string' && isLoginErrorCode(bodyCode)) {
           code = bodyCode;
@@ -55,12 +61,21 @@ async function readLoginError(response: Response): Promise<LoginError> {
         if (typeof bodyMessage === 'string') {
           message = bodyMessage;
         }
+        if (typeof bodyRetry === 'number' && Number.isFinite(bodyRetry) && bodyRetry > 0) {
+          retryAfterSeconds = Math.ceil(bodyRetry);
+        }
       }
     } catch {
       // non-JSON error body; keep the NETWORK_ERROR fallback
     }
   }
-  return new LoginError(code, message);
+  if (retryAfterSeconds === null) {
+    const headerRetry = Number(response.headers.get('Retry-After'));
+    if (Number.isFinite(headerRetry) && headerRetry > 0) {
+      retryAfterSeconds = Math.ceil(headerRetry);
+    }
+  }
+  return new LoginError(code, message, retryAfterSeconds);
 }
 
 /**

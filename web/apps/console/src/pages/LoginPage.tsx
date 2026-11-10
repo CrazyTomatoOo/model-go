@@ -1,14 +1,23 @@
-import { Button, Card, Form, Input, Typography } from 'antd';
-import { useState } from 'react';
+import { Alert, Button, Form, Input, Typography } from 'antd';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { LoginError, login, type LoginErrorCode } from '../features/auth/login';
+import useCountdown from '../lib/useCountdown';
 import { useAuth } from '../auth/AuthProvider';
+import './LoginPage.css';
 
 type LoginFormValues = {
   username: string;
   password: string;
 };
+
+/**
+ * Client-side cooldown after a 429 RATE_LIMITED. The backend contract
+ * (spec 2026-11-02 §4.5) carries no Retry-After, so the login page enforces
+ * a fixed retry window of its own and disables resubmission for it.
+ */
+const RATE_LIMIT_COOLDOWN_SECONDS = 60;
 
 // Spec §1: copy is keyed by the §4.5 code, never the backend message.
 const ERROR_KEY_BY_CODE: Record<LoginErrorCode, string> = {
@@ -17,19 +26,46 @@ const ERROR_KEY_BY_CODE: Record<LoginErrorCode, string> = {
   ACCOUNT_DISABLED: 'errors:ACCOUNT_DISABLED',
   ACCOUNT_LOCKED: 'errors:ACCOUNT_LOCKED',
   RATE_LIMITED: 'errors:RATE_LIMITED',
+  VALIDATION_ERROR: 'errors:VALIDATION_ERROR',
   NETWORK_ERROR: 'errors:NETWORK_ERROR',
 };
+
+/** Codes worth shaking the form for; NETWORK_ERROR is not the user's typo. */
+const SHAKEN_CODES: readonly LoginErrorCode[] = [
+  'INVALID_CREDENTIALS',
+  'ACCOUNT_PENDING',
+  'ACCOUNT_DISABLED',
+  'ACCOUNT_LOCKED',
+  'RATE_LIMITED',
+  'VALIDATION_ERROR',
+];
 
 export default function LoginPage() {
   const { t } = useTranslation(['common', 'errors']);
   const { setUser } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
-  const [errorCode, setErrorCode] = useState<LoginErrorCode | null>(null);
+  const [error, setError] = useState<{ code: LoginErrorCode; stamp: number } | null>(null);
+  const [cooldownWindow, setCooldownWindow] = useState<number | null>(null);
+  const cooldownLeft = useCountdown(cooldownWindow);
+  const cooldownActive = cooldownWindow !== null && cooldownLeft > 0;
+
+  // Route the window back through null at expiry so a later 429 with the
+  // same retry window re-arms the countdown instead of staying at 0.
+  useEffect(() => {
+    if (cooldownWindow !== null && cooldownLeft === 0) {
+      setCooldownWindow(null);
+    }
+  }, [cooldownWindow, cooldownLeft]);
 
   const handleSubmit = async (values: LoginFormValues) => {
+    // Enter key in a field still fires form submit; never hit the API while
+    // the rate-limit cooldown is running.
+    if (cooldownActive) {
+      return;
+    }
     setSubmitting(true);
-    setErrorCode(null);
+    setError(null);
     try {
       const res = await login(values.username, values.password);
       // Mount the returned user into AuthProvider so RequireAuth no longer
@@ -37,39 +73,83 @@ export default function LoginPage() {
       setUser(res.user);
       navigate(res.user.must_change_password ? '/change-password' : '/');
     } catch (err) {
-      setErrorCode(err instanceof LoginError ? err.code : 'NETWORK_ERROR');
+      const loginError = err instanceof LoginError ? err : null;
+      const code = loginError?.code ?? 'NETWORK_ERROR';
+      setError({ code, stamp: Date.now() });
+      if (code === 'RATE_LIMITED') {
+        // The contract's retry_after_seconds / Retry-After wins over the
+        // fixed fallback whenever the backend provides it.
+        setCooldownWindow(loginError?.retryAfterSeconds ?? RATE_LIMIT_COOLDOWN_SECONDS);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  const errorMessage = (code: LoginErrorCode): string =>
+    code === 'RATE_LIMITED'
+      ? t('login.rateLimited', { seconds: cooldownLeft })
+      : t(ERROR_KEY_BY_CODE[code]);
+
   return (
-    <Card style={{ maxWidth: 420, margin: '0 auto' }}>
-      <Typography.Title level={3}>{t('login.title')}</Typography.Title>
-      <Form layout="vertical" onFinish={handleSubmit}>
-        <Form.Item
-          label={t('login.username')}
-          name="username"
-          rules={[{ required: true, message: t('login.usernameRequired') }]}
-        >
-          <Input autoComplete="username" />
-        </Form.Item>
-        <Form.Item
-          label={t('login.password')}
-          name="password"
-          rules={[{ required: true, message: t('login.passwordRequired') }]}
-        >
-          <Input.Password autoComplete="current-password" />
-        </Form.Item>
-        <Button type="primary" htmlType="submit" block loading={submitting}>
-          {t('login.submit')}
-        </Button>
-        {errorCode !== null && (
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <Typography.Text type="danger">{t(ERROR_KEY_BY_CODE[errorCode])}</Typography.Text>
-          </div>
-        )}
-      </Form>
-    </Card>
+    <div className="login-page">
+      {/* Centered-card layout (#34; literal #29 checklist form per the #39
+          audit): one brand block above the card, both horizontally centered
+          as a column and vertically centered in the viewport. */}
+      <main className="login-main">
+        <div className="login-brand">
+          <Typography.Title level={2} className="login-brand-title">
+            {t('login.welcome')}
+          </Typography.Title>
+          <Typography.Paragraph className="login-brand-tagline">
+            {t('login.subtitle')}
+          </Typography.Paragraph>
+        </div>
+        <div className="login-card">
+          <Typography.Title level={1} className="login-title">
+            {t('login.title')}
+          </Typography.Title>
+          <Form layout="vertical" onFinish={handleSubmit} onValuesChange={() => setError(null)}>
+            <Form.Item
+              label={t('login.username')}
+              name="username"
+              rules={[{ required: true, message: t('login.usernameRequired') }]}
+            >
+              <Input autoComplete="username" autoFocus />
+            </Form.Item>
+            <Form.Item
+              label={t('login.password')}
+              name="password"
+              rules={[{ required: true, message: t('login.passwordRequired') }]}
+            >
+              <Input.Password autoComplete="current-password" />
+            </Form.Item>
+            {error !== null && (
+              <div
+                key={error.stamp}
+                className={SHAKEN_CODES.includes(error.code) ? 'login-error-shake' : undefined}
+              >
+                <Alert
+                  type="error"
+                  showIcon
+                  message={errorMessage(error.code)}
+                  closable={error.code !== 'RATE_LIMITED'}
+                  onClose={() => setError(null)}
+                />
+              </div>
+            )}
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              loading={submitting}
+              disabled={cooldownActive}
+            >
+              {t('login.submit')}
+            </Button>
+          </Form>
+        </div>
+      </main>
+    </div>
   );
 }

@@ -14,10 +14,13 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
+  // Serve the production build: the spec-32 E2E seam asserts behavior against
+  // built output, and /api is stubbed at the network layer (e2e/fixtures.ts),
+  // so neither the dev proxy nor a real apiserver is involved.
   webServer: {
-    command: 'pnpm dev --host 127.0.0.1 --port 4173',
+    command: 'pnpm run build && pnpm run preview --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173/login',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 });
