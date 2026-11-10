@@ -12,6 +12,8 @@ import type { Page, Route } from '@playwright/test';
 export type AuthReply = {
   status?: number;
   body?: unknown;
+  /** Extra response headers (e.g. Retry-After on a 429). */
+  headers?: Record<string, string>;
   /** Hold the response this long before answering (loading-state tests). */
   delayMs?: number;
 };
@@ -67,11 +69,12 @@ async function fulfillReply(route: Route, reply: AuthReply): Promise<void> {
   }
   const status = reply.status ?? 200;
   if (reply.body === undefined) {
-    await route.fulfill({ status, body: '' });
+    await route.fulfill({ status, headers: reply.headers, body: '' });
     return;
   }
   await route.fulfill({
     status,
+    headers: reply.headers,
     contentType: 'application/json',
     body: JSON.stringify(reply.body),
   });

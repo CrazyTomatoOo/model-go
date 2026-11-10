@@ -1,5 +1,6 @@
 import { Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
+import ChangePasswordModalHost from '../features/auth/ChangePasswordModalHost';
 import AppShell from '../shell/AppShell';
 
 /**
@@ -13,6 +14,7 @@ export default function ConsoleShellPage() {
   return (
     <AppShell>
       <Typography.Paragraph>{t('shell.placeholder')}</Typography.Paragraph>
+      <ChangePasswordModalHost />
     </AppShell>
   );
 }

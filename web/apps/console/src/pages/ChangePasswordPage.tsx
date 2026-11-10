@@ -18,6 +18,7 @@ type ChangePasswordFormValues = {
 const ERROR_KEYS: Record<ChangePasswordErrorCode, string> = {
   invalidInitialPassword: 'changePassword.errors.invalidInitialPassword',
   policyViolation: 'changePassword.errors.policyViolation',
+  rateLimited: 'changePassword.errors.rateLimited',
   network: 'changePassword.errors.network',
   unknown: 'changePassword.errors.unknown',
 };
