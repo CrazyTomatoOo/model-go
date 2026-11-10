@@ -12,6 +12,7 @@ export type LoginErrorCode =
   | 'ACCOUNT_DISABLED'
   | 'ACCOUNT_LOCKED'
   | 'RATE_LIMITED'
+  | 'VALIDATION_ERROR'
   | 'NETWORK_ERROR';
 
 const LOGIN_ERROR_CODES: readonly LoginErrorCode[] = [
@@ -20,6 +21,7 @@ const LOGIN_ERROR_CODES: readonly LoginErrorCode[] = [
   'ACCOUNT_DISABLED',
   'ACCOUNT_LOCKED',
   'RATE_LIMITED',
+  'VALIDATION_ERROR',
   'NETWORK_ERROR',
 ];
 
