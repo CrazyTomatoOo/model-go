@@ -22,6 +22,10 @@ on:
       - '.github/workflows/console-e2e.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   e2e:
     name: console E2E (playwright, harness-mocked) + Lighthouse CI
@@ -53,7 +57,7 @@ jobs:
       # specs is a single command, sibling tickets add specs transparently.
       - name: Run E2E
         working-directory: web
-        run: pnpm --filter console exec playwright test --workers=2
+        run: pnpm --filter console exec playwright test
 
       # Keep a preview of the same dist alive for Lighthouse. (lhci's own
       # static server is not used: with staticDistDir it rewrites url ports to
@@ -71,13 +75,46 @@ jobs:
           echo "preview did not become ready" >&2
           exit 1
 
-      # .lighthouserc.json lives in web/apps/console. Only the two public
-      # pages (/login, /) are asserted — guarded routes need auth mocks that
-      # lhci cannot provide. lhci uses the Chrome preinstalled on ubuntu-latest
+      # .lighthouserc.json lives in web/apps/console: /login is the only
+      # audited URL — guarded routes need auth mocks lhci cannot provide —
+      # with performance as the error-level gate and the other categories
+      # on warn (#38). lhci uses the Chrome preinstalled on ubuntu-latest
       # runners (set CHROME_PATH to override).
       - name: Lighthouse CI
         working-directory: web/apps/console
-        run: pnpm dlx @lhci/cli@latest autorun
+        # Pinned: @latest floated across a breaking change once before.
+        run: pnpm dlx @lhci/cli@0.14 autorun 2>&1 | tee /tmp/lhci.log
+
+      # #38: report links where reviewers look — the run's step summary and
+      # one sticky PR comment. No GitHub App token needed for either.
+      - name: Lighthouse report links
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.existsSync('/tmp/lhci.log') ? fs.readFileSync('/tmp/lhci.log', 'utf8') : '';
+            const urls = [...new Set([...log.matchAll(/https:\/\/storage\.googleapis\.com\/[^\s)'"]+/g)].map((m) => m[0]))];
+            const lines = urls.length
+              ? urls.map((u) => `- ${u}`).join('\n')
+              : '- (no uploaded report URLs found in the lhci output)';
+            await core.summary.addHeading('Lighthouse reports').addRaw(lines).write();
+            const pr = context.payload.pull_request;
+            if (pr && urls.length > 0) {
+              const marker = '<!-- lhci-report-links -->';
+              const { data: comments } = await github.rest.issues.listComments({
+                ...context.repo,
+                issue_number: pr.number,
+                per_page: 100,
+              });
+              const body = `${marker}\n## Lighthouse reports\n${lines}`;
+              const existing = comments.find((c) => c.body?.includes(marker));
+              if (existing) {
+                await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body });
+              }
+            }
 
       - name: Upload Playwright artifacts
         if: failure()
