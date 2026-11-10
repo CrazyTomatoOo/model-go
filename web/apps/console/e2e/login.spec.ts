@@ -1,7 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 // 真浏览器回归（issue #22 ⑥）：登录→强制改密→外壳→登出。
-// 说明：CI 里用临时 Postgres/Redis，apiserver 走真实启动，浏览器只走 vite dev server。
+// 说明：这条回归驱动真实 apiserver（经 vite dev proxy）。spec-32 的 E2E harness
+// 改为 vite preview 起构建产物并在网络层拦 /api/v1/auth/*，preview 没有 /api
+// 代理，因此在 CI job 改造回可直连后端之前保持跳过（见 #32 Testing Decisions）。
+test.skip(
+  !process.env.E2E_REAL_APISERVER,
+  'requires a real apiserver; the vite-preview harness stubs /api at the network layer',
+);
 const username = process.env.E2E_USERNAME ?? 'sysadmin';
 const oldPassword = process.env.E2E_OLD_PASSWORD ?? 'Bootstrap@Passw0rd';
 const newPassword = process.env.E2E_NEW_PASSWORD ?? 'E2E@Strong#2026';
