@@ -1,0 +1,140 @@
+/* Split login layout (#34): brand panel beside the form panel, collapsing to
+   a single column on narrow screens. Every color references the antd cssVar
+   theme tokens (theme/brand.ts) so the future dark theme (#26) inherits the
+   whole page with no edits here. */
+
+.login-page {
+  display: grid;
+  grid-template-columns: minmax(320px, 5fr) 7fr;
+  min-height: 100vh;
+}
+
+/* Brand panel: layered light pools over the brand-indigo base. The white
+   overlays are decorative translucency on the brand surface, not palette
+   colors, so they stay literal rgba(255,255,255,…). */
+.login-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 48px;
+  color: var(--ant-color-white, #fff);
+  background:
+    radial-gradient(120% 90% at 85% 10%, rgba(255, 255, 255, 0.18), transparent 55%),
+    radial-gradient(90% 70% at 10% 90%, rgba(255, 255, 255, 0.12), transparent 60%),
+    linear-gradient(
+      160deg,
+      var(--ant-color-primary, #2f54eb) 0%,
+      var(--ant-color-primary-active, #1d39c4) 100%
+    );
+}
+
+/* Decorative ring, kept abstract so it never reads as content. */
+.login-brand::after {
+  content: '';
+  position: absolute;
+  right: -96px;
+  bottom: -96px;
+  width: 280px;
+  height: 280px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+}
+
+.login-brand-title.ant-typography {
+  margin-bottom: 16px;
+  color: var(--ant-color-white, #fff);
+}
+
+.login-brand-tagline {
+  margin-bottom: 0;
+  font-size: var(--ant-font-size-lg, 16px);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.login-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.login-form-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 48px 24px 24px;
+}
+
+.login-error-shake {
+  margin-bottom: 24px;
+  animation: login-error-shake 0.4s ease-in-out;
+  /* Restart the keyframes on every error: the error wrapper is remounted per
+     error (key=stamp), which retriggers the animation. */
+}
+
+@keyframes login-error-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  gap: 12px;
+  padding: 16px 24px;
+}
+
+.login-footer-link {
+  font-size: var(--ant-font-size-sm, 12px);
+  color: var(--ant-color-text-secondary, rgba(0, 0, 0, 0.65));
+}
+
+.login-footer-link:hover {
+  color: var(--ant-color-primary, #2f54eb);
+}
+
+.login-footer-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--ant-color-split, rgba(5, 5, 5, 0.06));
+}
+
+.login-footer-icp {
+  font-size: var(--ant-font-size-sm, 12px);
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand {
+    padding: 32px 24px;
+  }
+
+  .login-brand-title.ant-typography {
+    margin-bottom: 8px;
+  }
+}

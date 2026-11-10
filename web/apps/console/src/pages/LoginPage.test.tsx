@@ -44,7 +44,9 @@ function okBody(mustChangePassword: boolean): string {
  * bootstrap GET /auth/me has no session, and POST /auth/login answers through
  * the provided responder.
  */
-function stubAuthRoutes(loginResponse?: () => Response): ReturnType<typeof vi.fn> {
+function stubAuthRoutes(
+  loginResponse?: () => Response | Promise<Response>,
+): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
     const method = (init?.method ?? 'GET').toUpperCase();
@@ -166,7 +168,9 @@ describe('LoginPage', () => {
     ['ACCOUNT_PENDING', 403, 'Account is pending approval by a security administrator'],
     ['ACCOUNT_DISABLED', 403, 'Account is disabled, contact the administrator'],
     ['ACCOUNT_LOCKED', 403, 'Too many failed login attempts, account locked for 15 minutes'],
-    ['RATE_LIMITED', 429, 'Too many requests, please try again later'],
+    ['VALIDATION_ERROR', 400, 'The submitted information is invalid, please check and try again'],
+    // RATE_LIMITED renders the live countdown copy instead of the static one.
+    ['RATE_LIMITED', 429, /try again in 60s/],
   ])('shows the mapped copy for the %s error', async (code, status, copy) => {
     globalThis.fetch = stubAuthRoutes(
       () =>
@@ -179,6 +183,71 @@ describe('LoginPage', () => {
     fillAndSubmit('alice', 'secret');
 
     await screen.findByText(copy);
+  });
+
+  it('spins the submit button while the login request is pending', async () => {
+    let resolveLogin!: (response: Response) => void;
+    const gate = new Promise<Response>((resolve) => {
+      resolveLogin = resolve;
+    });
+    globalThis.fetch = stubAuthRoutes(() => gate) as unknown as typeof fetch;
+    renderLoginPage();
+
+    fillAndSubmit('alice', 'secret');
+
+    // antd Button `loading` swaps in the LoadingOutlined spin (its loading
+    // icon slot) for the whole in-flight window.
+    const button = (await screen.findByRole('button', { name: 'Sign in' })) as HTMLButtonElement;
+    await waitFor(() => {
+      expect(button.className).toContain('ant-btn-loading');
+    });
+    expect(button.querySelector('.ant-btn-loading-icon')).not.toBeNull();
+
+    resolveLogin(new Response(okBody(false), { status: 200 }));
+    await screen.findByText('ROOT_LANDING');
+  });
+
+  it('shakes the error alert on invalid credentials', async () => {
+    globalThis.fetch = stubAuthRoutes(
+      () =>
+        new Response(JSON.stringify({ code: 'INVALID_CREDENTIALS', message: 'server message' }), {
+          status: 401,
+        }),
+    ) as unknown as typeof fetch;
+    renderLoginPage();
+
+    fillAndSubmit('alice', 'secret');
+
+    const copy = await screen.findByText('Incorrect username or password');
+    expect(copy.closest('.login-error-shake')).not.toBeNull();
+  });
+
+  it('does not shake for a network error', async () => {
+    globalThis.fetch = stubAuthRoutes(() => {
+      throw new TypeError('fetch failed');
+    }) as unknown as typeof fetch;
+    renderLoginPage();
+
+    fillAndSubmit('alice', 'secret');
+
+    const copy = await screen.findByText('Network error, please try again later');
+    expect(copy.closest('.login-error-shake')).toBeNull();
+  });
+
+  it('shows a retry countdown and disables resubmission when rate limited', async () => {
+    globalThis.fetch = stubAuthRoutes(
+      () =>
+        new Response(JSON.stringify({ code: 'RATE_LIMITED', message: 'rate limited' }), {
+          status: 429,
+        }),
+    ) as unknown as typeof fetch;
+    renderLoginPage();
+
+    fillAndSubmit('alice', 'secret');
+
+    await screen.findByText(/try again in 60s/);
+    const button = screen.getByRole('button', { name: 'Sign in' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
   });
 
   it('shows the network error copy when the request cannot reach the server', async () => {
