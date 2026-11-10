@@ -3,7 +3,7 @@ import type { MenuProps } from 'antd';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
-import { chromeMenuTokens } from './chromeTokens';
+import { chromeInkVars, chromeMenuTokens } from './chromeTokens';
 import { requestChangePassword } from './changePasswordBus';
 import { KeyIcon, MenuIcon, OverviewIcon } from './icons';
 import LanguageSwitch from './LanguageSwitch';
@@ -91,6 +91,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         {tier !== 'mobile' && (
           <Sider
             className="shell-chrome"
+            style={chromeInkVars as React.CSSProperties}
             width={200}
             collapsedWidth={80}
             collapsed={tier === 'tablet'}
@@ -105,7 +106,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </Sider>
         )}
         <Layout>
-          <Header className="shell-chrome shell-header">
+          <Header className="shell-chrome shell-header" style={chromeInkVars as React.CSSProperties}>
             {tier === 'mobile' && (
               <button
                 type="button"
@@ -131,6 +132,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         {tier === 'mobile' && (
           <Drawer
             rootClassName="shell-drawer"
+            style={chromeInkVars as React.CSSProperties}
             placement="left"
             width={280}
             open={drawerOpen}

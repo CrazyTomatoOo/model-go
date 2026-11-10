@@ -4,17 +4,11 @@
    (borderRadius 6). Page content styles stay out of here — chrome only. */
 
 /* Chrome surfaces: inline sider/header (.shell-chrome) and the mobile drawer
-   (.shell-drawer, portaled to <body>). Both define the ink constants; the
-   drawer content re-declares the brand surface because the portal sits
-   outside the inline chrome scope. */
-.shell-chrome,
-.shell-drawer {
-  --shell-ink: #ffffff;
-  --shell-ink-dim: rgba(255, 255, 255, 0.85);
-  --shell-ink-hover: rgba(255, 255, 255, 0.12);
-  --shell-ink-active: rgba(255, 255, 255, 0.22);
-  --shell-hairline: rgba(255, 255, 255, 0.25);
-}
+   (.shell-drawer, portaled to <body>). The --shell-ink-* custom properties
+   are injected inline from chromeTokens.ts (chromeInkVars), so this file
+   references them without re-declaring any palette value. The drawer
+   content re-declares the brand surface because the portal sits outside
+   the inline chrome scope. */
 
 /* Element-qualified so both classes beat antd's single-class defaults
    (.ant-layout-header/.ant-layout-sider also carry the navy #001529). */

@@ -93,17 +93,22 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <aside className="login-brand">
-        <div className="login-brand-inner">
-          <h1 className="login-brand-title">{t('login.welcome')}</h1>
+      {/* Centered-card layout (#34; literal #29 checklist form per the #39
+          audit): one brand block above the card, both horizontally centered
+          as a column and vertically centered in the viewport. */}
+      <main className="login-main">
+        <div className="login-brand">
+          <Typography.Title level={2} className="login-brand-title">
+            {t('login.welcome')}
+          </Typography.Title>
           <Typography.Paragraph className="login-brand-tagline">
             {t('login.subtitle')}
           </Typography.Paragraph>
         </div>
-      </aside>
-      <main className="login-panel">
-        <div className="login-form-wrap">
-          <Typography.Title level={3}>{t('login.title')}</Typography.Title>
+        <div className="login-card">
+          <Typography.Title level={1} className="login-title">
+            {t('login.title')}
+          </Typography.Title>
           <Form layout="vertical" onFinish={handleSubmit} onValuesChange={() => setError(null)}>
             <Form.Item
               label={t('login.username')}

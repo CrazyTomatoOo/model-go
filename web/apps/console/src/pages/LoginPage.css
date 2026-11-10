@@ -1,76 +1,57 @@
-/* Split login layout (#34): brand panel beside the form panel, collapsing to
-   a single column on narrow screens. Every color references the antd cssVar
-   theme tokens (theme/brand.ts) so the future dark theme (#26) inherits the
-   whole page with no edits here. */
+/* Centered login layout (#34; #39 C03): one brand block above a card, both
+   centered as a column and vertically centered in the viewport. Every color
+   references the antd cssVar theme tokens (theme/brand.ts) so the future
+   dark theme (#26) inherits the whole page with no edits here. */
 
 .login-page {
-  display: grid;
-  grid-template-columns: minmax(320px, 5fr) 7fr;
-  min-height: 100vh;
-}
-
-/* Brand panel: layered light pools over the brand-indigo base. The white
-   overlays are decorative translucency on the brand surface, not palette
-   colors, so they stay literal rgba(255,255,255,…). */
-.login-brand {
-  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   box-sizing: border-box;
-  overflow: hidden;
-  padding: 48px;
-  color: var(--ant-color-white, #fff);
-  background:
-    radial-gradient(120% 90% at 85% 10%, rgba(255, 255, 255, 0.18), transparent 55%),
-    radial-gradient(90% 70% at 10% 90%, rgba(255, 255, 255, 0.12), transparent 60%),
-    linear-gradient(
-      160deg,
-      var(--ant-color-primary, #2f54eb) 0%,
-      var(--ant-color-primary-active, #1d39c4) 100%
-    );
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--ant-color-bg-layout, #f5f5f5);
 }
 
-/* Decorative ring, kept abstract so it never reads as content. */
-.login-brand::after {
-  content: '';
-  position: absolute;
-  right: -96px;
-  bottom: -96px;
-  width: 280px;
-  height: 280px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
+.login-main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(400px, 100%);
+}
+
+/* Brand block above the card: indigo headline over a muted tagline. */
+.login-brand {
+  margin-bottom: 24px;
+  text-align: center;
 }
 
 .login-brand-title {
-  margin: 0 0 16px;
-  font-size: var(--ant-font-size-heading-2, 30px);
-  line-height: var(--ant-line-height-heading-2, 1.3333);
-  color: var(--ant-color-white, #fff);
+  margin: 0 0 8px;
+  color: var(--ant-color-primary, #2f54eb);
 }
 
 .login-brand-tagline {
   margin-bottom: 0;
-  font-size: var(--ant-font-size-lg, 16px);
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--ant-color-text-secondary, rgba(0, 0, 0, 0.65));
 }
 
-.login-panel {
-  display: flex;
-  flex-direction: column;
-  background: var(--ant-color-bg-container, #fff);
-}
-
-.login-form-wrap {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  justify-content: center;
+/* The card itself: viewport-centered via .login-page's flex column. */
+.login-card {
   box-sizing: border-box;
-  width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
-  padding: 48px 24px 24px;
+  padding: 32px;
+  background: var(--ant-color-bg-container, #fff);
+  border-radius: var(--ant-border-radius-lg, 8px);
+  box-shadow:
+    var(--ant-box-shadow, 0 6px 16px 0 rgba(0, 0, 0, 0.08)),
+    0 3px 6px -4px rgba(0, 0, 0, 0.12),
+    0 9px 28px 8px rgba(0, 0, 0, 0.05);
+}
+
+.login-title {
+  margin-top: 0;
+  text-align: center;
 }
 
 .login-error-shake {
@@ -101,14 +82,10 @@
 
 @media (max-width: 768px) {
   .login-page {
-    grid-template-columns: 1fr;
+    padding: 16px;
   }
 
-  .login-brand {
-    padding: 32px 24px;
-  }
-
-  .login-brand-title {
-    margin-bottom: 8px;
+  .login-card {
+    padding: 24px;
   }
 }

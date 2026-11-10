@@ -17,7 +17,24 @@ export const chromeInk = {
   hover: 'rgba(255, 255, 255, 0.12)',
   /** Selected/active wash, one step above hover. */
   active: 'rgba(255, 255, 255, 0.22)',
+  /** Hairline between chrome regions (sider edge, drawer header/actions). */
+  hairline: 'rgba(255, 255, 255, 0.25)',
 } as const;
+
+/**
+ * The chrome ink palette as CSS custom properties, injected inline by
+ * AppShell on every brand-chrome scope (sider, header, mobile drawer). The
+ * CSS file consumes var(--shell-ink-*) only — chromeInk above is the single
+ * source for the whole palette, which is what the dark-mode wiring (#26)
+ * swaps.
+ */
+export const chromeInkVars: Record<string, string> = {
+  '--shell-ink': chromeInk.base,
+  '--shell-ink-dim': chromeInk.dim,
+  '--shell-ink-hover': chromeInk.hover,
+  '--shell-ink-active': chromeInk.active,
+  '--shell-hairline': chromeInk.hairline,
+};
 
 /**
  * Menu tokens for menus rendered directly on the brand chrome (sider and

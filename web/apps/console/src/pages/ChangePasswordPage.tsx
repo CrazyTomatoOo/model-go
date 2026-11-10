@@ -9,6 +9,8 @@ import {
   type ChangePasswordErrorCode,
 } from '../features/auth/changePassword';
 import PasswordPolicyList from '../features/auth/PasswordPolicyList';
+import GuardLoading from '../router/GuardLoading';
+import './ChangePasswordPage.css';
 
 type ChangePasswordFormValues = {
   oldPassword: string;
@@ -28,33 +30,62 @@ export default function ChangePasswordPage() {
   const { t } = useTranslation();
   const { setUser } = useAuth();
   const navigate = useNavigate();
+  const [form] = Form.useForm();
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Success transition: keep a loading surface painted while the shell
+  // chunk warms, so no empty frame lands between this page unmounting and
+  // the shell mounting (#39 C13).
+  const [leaving, setLeaving] = useState(false);
 
   const onFinish = async (values: ChangePasswordFormValues): Promise<void> => {
     setErrorKey(null);
     setSubmitting(true);
     try {
       await changePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword });
-      // The backend cleared must_change_password on success; mirror it in the
-      // context so RequirePasswordChange no longer bounces back.
-      setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
-      navigate('/');
+      // The backend cleared must_change_password on success. Warm the shell
+      // chunk (same module App.tsx's lazy() resolves) while a loading
+      // surface stays painted, then mirror the flag and navigate — the
+      // post-navigation shell render is synchronous, no blank frame.
+      setLeaving(true);
+      import('./ConsoleShellPage')
+        .catch(() => undefined)
+        .finally(() => {
+          setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
+          navigate('/', { replace: true });
+        });
     } catch (error) {
-      setErrorKey(
-        error instanceof ChangePasswordError
-          ? ERROR_KEYS[error.code]
-          : 'changePassword.errors.unknown',
-      );
+      if (error instanceof ChangePasswordError) {
+        // Field-level mapping like the shell modal (#35): server errors[]
+        // attach to the offending field instead of a generic form alert.
+        if (error.code === 'invalidInitialPassword') {
+          form.setFields([
+            { name: 'oldPassword', errors: [t('changePassword.errors.invalidInitialPassword')] },
+          ]);
+        } else if (error.code === 'policyViolation') {
+          form.setFields([
+            { name: 'newPassword', errors: [t('changePassword.errors.policyViolation')] },
+          ]);
+        } else {
+          setErrorKey(ERROR_KEYS[error.code]);
+        }
+      } else {
+        setErrorKey('changePassword.errors.unknown');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (leaving) {
+    return <GuardLoading />;
+  }
+
   return (
-    <Card style={{ maxWidth: 420, margin: '0 auto' }}>
-      <Typography.Title level={1}>{t('changePassword.title')}</Typography.Title>
-      <Form layout="vertical" onFinish={onFinish} onValuesChange={() => setErrorKey(null)}>
+    <div className="change-password-page">
+      <Card style={{ maxWidth: 420, width: '100%' }}>
+        <Typography.Title level={1}>{t('changePassword.title')}</Typography.Title>
+        <Form form={form} layout="vertical" onFinish={onFinish} onValuesChange={() => setErrorKey(null)}>
         <Form.Item
           label={t('changePassword.oldPassword')}
           name="oldPassword"
@@ -102,6 +133,7 @@ export default function ChangePasswordPage() {
           {t('changePassword.submit')}
         </Button>
       </Form>
-    </Card>
+      </Card>
+    </div>
   );
 }
