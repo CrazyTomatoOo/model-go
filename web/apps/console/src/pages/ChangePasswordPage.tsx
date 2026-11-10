@@ -45,14 +45,17 @@ export default function ChangePasswordPage() {
       await changePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword });
       // The backend cleared must_change_password on success. Warm the shell
       // chunk (same module App.tsx's lazy() resolves) while a loading
-      // surface stays painted, then mirror the flag and navigate — the
-      // post-navigation shell render is synchronous, no blank frame.
+      // surface stays painted. Order matters: navigate FIRST, then clear the
+      // flag, both in this same microtask so React batches them into one
+      // commit — /change-password unmounts outright instead of its
+      // ChangePasswordGate re-rendering <Navigate> (which renders null and
+      // paints one blank frame, #39 C13).
       setLeaving(true);
       import('./ConsoleShellPage')
         .catch(() => undefined)
         .finally(() => {
-          setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
           navigate('/', { replace: true });
+          setUser((prev) => (prev === null ? prev : { ...prev, must_change_password: false }));
         });
     } catch (error) {
       if (error instanceof ChangePasswordError) {
