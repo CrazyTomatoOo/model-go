@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
+import GuardLoading from './GuardLoading';
 
 /**
  * Renders children only for an authenticated user; logged-out visits go to
@@ -10,7 +11,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) {
-    return null;
+    return <GuardLoading />;
   }
   if (user === null) {
     return <Navigate to="/login" replace state={{ from: location }} />;
@@ -44,7 +45,7 @@ export function ChangePasswordGate({ children }: { children: ReactNode }) {
 export function LoginGate({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return null;
+    return <GuardLoading />;
   }
   if (user !== null) {
     return <Navigate to={user.must_change_password ? '/change-password' : '/'} replace />;
