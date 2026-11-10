@@ -8,13 +8,18 @@ export type ChangePasswordPayload = {
 export type ChangePasswordErrorCode =
   | 'invalidInitialPassword'
   | 'policyViolation'
+  | 'rateLimited'
   | 'network'
   | 'unknown';
 
 export class ChangePasswordError extends Error {
   readonly name = 'ChangePasswordError';
 
-  constructor(readonly code: ChangePasswordErrorCode) {
+  constructor(
+    readonly code: ChangePasswordErrorCode,
+    /** Server-provided Retry-After seconds when code is 'rateLimited'. */
+    readonly retryAfterSeconds: number | null = null,
+  ) {
     super(code);
   }
 }
@@ -31,6 +36,10 @@ export async function changePassword(payload: ChangePasswordPayload): Promise<vo
     // errors[].field (old_password vs new_password). 401 on this endpoint is
     // SESSION_EXPIRED, handled globally by apiFetch.
     if (error instanceof ApiError) {
+      // 429 RATE_LIMITED (§4.5): the modal turns this into a submit countdown.
+      if (error.code === 'RATE_LIMITED') {
+        throw new ChangePasswordError('rateLimited', error.retryAfterSeconds);
+      }
       if (error.code === 'VALIDATION_ERROR') {
         const field = error.errors?.[0]?.field;
         if (field === 'old_password') throw new ChangePasswordError('invalidInitialPassword');
