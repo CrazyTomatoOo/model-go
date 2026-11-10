@@ -126,7 +126,9 @@ describe('App integration (AuthProvider + routes)', () => {
     fillAndSubmitPasswordChange();
 
     await screen.findByText('Signed in. The workspace arrives in a later iteration.');
-    screen.getByText('alice');
+    // The shell user menu shows avatar initials derived from the username
+    // (the /auth/me stub carries no display_name).
+    screen.getByText('A');
     const passwordCalls = fetchMock.mock.calls.filter(
       ([input]) => String(input) === '/api/v1/auth/password',
     );
@@ -147,7 +149,7 @@ describe('App integration (AuthProvider + routes)', () => {
     renderApp('/');
 
     await screen.findByText('Signed in. The workspace arrives in a later iteration.');
-    screen.getByText('alice');
+    screen.getByText('A');
     expect(getCsrfToken()).toBe('tok-me');
   });
 
@@ -166,9 +168,14 @@ describe('App integration (AuthProvider + routes)', () => {
     renderApp('/');
 
     await screen.findByText('Signed in. The workspace arrives in a later iteration.');
-    fireEvent.click(screen.getByText('alice'));
+    fireEvent.click(screen.getByText('A'));
     const logoutItem = await screen.findByText('Log out');
     fireEvent.click(logoutItem);
+
+    // #36: logout asks for confirmation before ending the session.
+    const confirmDialog = await screen.findByRole('dialog');
+    expect(confirmDialog.textContent).toContain('Sign out of the current account?');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await screen.findByText('Sign in to Console');
     const logoutCalls = fetchMock.mock.calls.filter(
