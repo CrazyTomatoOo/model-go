@@ -1,0 +1,11 @@
+# 本地 kind 集群：80/443 映射到宿主机 localhost，ingress-nginx 消费。
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: model-go
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+  - containerPort: 443
+    hostPort: 443

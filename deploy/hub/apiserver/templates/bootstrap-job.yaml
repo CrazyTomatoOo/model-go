@@ -1,0 +1,39 @@
+{{- if .Values.bootstrap.enabled }}
+# 一次性初始化三个管理员（login design spec §8/§9）。幂等：已有管理员时正常退出。
+# 密码经 term.ReadPassword 读取（要 TTY），用 GNU script 伪 TTY 从 stdin 喂三行。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "model-go-apiserver.fullname" . }}-bootstrap
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+  labels:
+    {{- include "model-go-apiserver.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: bootstrap
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - sh
+        - -c
+        - 'printf ''%s\n%s\n%s\n'' "$BOOTSTRAP_SYSADMIN_PW" "$BOOTSTRAP_SECADMIN_PW" "$BOOTSTRAP_AUDITADMIN_PW" | script -qec "stty -echo; apiserver admin bootstrap" /dev/null'
+        env:
+        - name: MODELGO_POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "model-go-apiserver.fullname" . }}
+              key: postgres-dsn
+        - name: BOOTSTRAP_SYSADMIN_PW
+          value: {{ .Values.bootstrap.passwords.sysadmin | quote }}
+        - name: BOOTSTRAP_SECADMIN_PW
+          value: {{ .Values.bootstrap.passwords.secadmin | quote }}
+        - name: BOOTSTRAP_AUDITADMIN_PW
+          value: {{ .Values.bootstrap.passwords.auditadmin | quote }}
+{{- end }}

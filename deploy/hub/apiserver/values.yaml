@@ -1,10 +1,35 @@
+# 默认镜像指向 GHCR（云上意图）。kind 本地联调时安装命令 --set 覆盖：
+#   --set image.repository=model-go-apiserver,image.tag=dev
 image:
   repository: ghcr.io/crazytomatooo/model-go-apiserver
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
-replicaCount: 2
+replicaCount: 1
 
 service:
   type: ClusterIP
   port: 8080
+
+# 必填。kind 联调示例见 deploy/README「本地 kind 联调环境」。
+postgres:
+  dsn: ""
+redis:
+  addr: ""
+
+# 仅全新环境置 true：post-install Job 创建 sysadmin/secadmin/auditadmin 三个初始管理员。
+# 密码只进 values 不进 git（kind 用 --set 传）；生产环境用一次性 Job 手动执行并即时销毁。
+bootstrap:
+  enabled: false
+  passwords:
+    sysadmin: ""
+    secadmin: ""
+    auditadmin: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi

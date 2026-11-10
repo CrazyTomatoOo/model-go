@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "model-go-apiserver.fullname" . }}
+  labels:
+    {{- include "model-go-apiserver.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "model-go-apiserver.name" . }}
+  template:
+    metadata:
+      labels:
+        {{- include "model-go-apiserver.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: apiserver
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: ["serve"]
+        env:
+        - name: MODELGO_HTTP_ADDR
+          value: ":8080"
+        - name: MODELGO_POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "model-go-apiserver.fullname" . }}
+              key: postgres-dsn
+        - name: MODELGO_REDIS_ADDR
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "model-go-apiserver.fullname" . }}
+              key: redis-addr
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}

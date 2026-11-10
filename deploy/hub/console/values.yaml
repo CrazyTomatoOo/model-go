@@ -1,0 +1,30 @@
+# 默认镜像指向 GHCR（云上意图）。kind 本地联调时安装命令 --set 覆盖：
+#   --set image.repository=model-go-console,image.tag=dev
+image:
+  repository: ghcr.io/crazytomatooo/model-go-console
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# apiserver 服务的集群内地址（console nginx 反代 /api 的目标）
+backend:
+  host: model-go-apiserver
+  port: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: localhost
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
