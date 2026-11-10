@@ -15,15 +15,22 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
 
 /**
  * Keeps document.title in sync with the active route using i18n copy
- * (checklist A8, #33). Route-level mechanism: the effect re-runs on pathname
- * change only. Language-switch-triggered title refresh builds on top of this
- * in T5 (#37) — deliberately out of scope here.
+ * (checklist A8, #33). The effect re-runs on pathname change, and the
+ * languageChanged subscription refreshes the title in place when the
+ * language toggles — no navigation required (#37).
  */
 export default function DocumentTitle() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const key = ROUTE_TITLE_KEYS[pathname] ?? 'notFound.title';
-    document.title = `${i18n.t(key)} · ${i18n.t('app.name')}`;
+    const applyTitle = () => {
+      const key = ROUTE_TITLE_KEYS[pathname] ?? 'notFound.title';
+      document.title = `${i18n.t(key)} · ${i18n.t('app.name')}`;
+    };
+    applyTitle();
+    i18n.on('languageChanged', applyTitle);
+    return () => {
+      i18n.off('languageChanged', applyTitle);
+    };
   }, [pathname]);
   return null;
 }
