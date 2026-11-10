@@ -125,7 +125,9 @@ describe('App integration (AuthProvider + routes)', () => {
     await screen.findByText('First sign-in: change your password');
     fillAndSubmitPasswordChange();
 
-    await screen.findByText('Signed in. The workspace arrives in a later iteration.');
+    // T5 (#37): the shell content is the overview — cards with designed
+    // empty states behind the auth gate.
+    await screen.findByText('No GPU resources connected');
     // The shell user menu shows avatar initials derived from the username
     // (the /auth/me stub carries no display_name).
     screen.getByText('A');
@@ -148,7 +150,7 @@ describe('App integration (AuthProvider + routes)', () => {
 
     renderApp('/');
 
-    await screen.findByText('Signed in. The workspace arrives in a later iteration.');
+    await screen.findByText('No GPU resources connected');
     screen.getByText('A');
     expect(getCsrfToken()).toBe('tok-me');
   });
@@ -167,7 +169,7 @@ describe('App integration (AuthProvider + routes)', () => {
 
     renderApp('/');
 
-    await screen.findByText('Signed in. The workspace arrives in a later iteration.');
+    await screen.findByText('No GPU resources connected');
     fireEvent.click(screen.getByText('A'));
     const logoutItem = await screen.findByText('Log out');
     fireEvent.click(logoutItem);

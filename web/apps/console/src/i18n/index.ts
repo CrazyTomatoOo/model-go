@@ -12,7 +12,7 @@ void i18n
     defaultNS: 'common',
     fallbackLng: 'en',
     supportedLngs: ['en', 'zh'],
-    ns: ['common'],
+    ns: ['common', 'overview'],
     interpolation: { escapeValue: false },
     detection: {
       order: ['navigator', 'localStorage'],
