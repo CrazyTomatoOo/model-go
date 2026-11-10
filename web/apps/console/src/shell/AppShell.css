@@ -1,0 +1,152 @@
+/* Shell chrome (#36): brand surfaces + header/drawer layout.
+   The background comes from the antd cssVar theme (theme/brand.ts), the ink
+   constants mirror chromeTokens.ts, and the radius follows the brand seed
+   (borderRadius 6). Page content styles stay out of here — chrome only. */
+
+/* Chrome surfaces: inline sider/header (.shell-chrome) and the mobile drawer
+   (.shell-drawer, portaled to <body>). Both define the ink constants; the
+   drawer content re-declares the brand surface because the portal sits
+   outside the inline chrome scope. */
+.shell-chrome,
+.shell-drawer {
+  --shell-ink: #ffffff;
+  --shell-ink-dim: rgba(255, 255, 255, 0.85);
+  --shell-ink-hover: rgba(255, 255, 255, 0.12);
+  --shell-ink-active: rgba(255, 255, 255, 0.22);
+  --shell-hairline: rgba(255, 255, 255, 0.25);
+}
+
+/* Element-qualified so both classes beat antd's single-class defaults
+   (.ant-layout-header/.ant-layout-sider also carry the navy #001529). */
+.ant-layout-header.shell-chrome,
+.ant-layout-sider.shell-chrome {
+  background-color: var(--ant-color-primary);
+}
+
+/* Two-class selectors throughout: antd's runtime stylesheets land after this
+   file, so equal specificity would let the defaults win. */
+.shell-header .shell-brand {
+  margin: 0;
+  color: var(--shell-ink);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shell-chrome ul.ant-menu-inline {
+  border-inline-end: 1px solid var(--shell-hairline);
+}
+
+.shell-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-inline: 16px;
+  line-height: normal;
+}
+
+.shell-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+/* Transparent icon button used by the mobile hamburger. */
+.shell-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ant-border-radius, 6px);
+  background: transparent;
+  color: var(--shell-ink);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.shell-icon-button:hover {
+  background: var(--shell-ink-hover);
+}
+
+.shell-icon-button:focus-visible {
+  outline: 2px solid var(--shell-ink);
+  outline-offset: 2px;
+}
+
+/* User menu trigger: avatar + name on the brand header. */
+.shell-user-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--ant-border-radius, 6px);
+  background: transparent;
+  color: var(--shell-ink);
+  font-size: 14px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.shell-user-button:hover {
+  background: var(--shell-ink-hover);
+}
+
+.shell-user-button:focus-visible {
+  outline: 2px solid var(--shell-ink);
+  outline-offset: 2px;
+}
+
+.shell-user-button .shell-avatar {
+  background-color: var(--shell-ink);
+  color: var(--ant-color-primary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.shell-user-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mobile drawer shares the brand chrome surface. */
+/* Element-qualified to beat antd's .ant-drawer .ant-drawer-content etc.
+   (equal two-class specificity would lose to antd's later-injected rules). */
+.shell-drawer div.ant-drawer-content {
+  background-color: var(--ant-color-primary);
+}
+
+.shell-drawer div.ant-drawer-header {
+  background: transparent;
+  border-bottom: 1px solid var(--shell-hairline);
+  padding-block: 12px;
+}
+
+.shell-drawer button.ant-drawer-close {
+  color: var(--shell-ink);
+}
+
+.shell-drawer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 4px 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--shell-hairline);
+}
+
+.shell-content {
+  padding: 24px;
+}
+
+@media (max-width: 767px) {
+  .shell-content {
+    padding: 16px;
+  }
+}

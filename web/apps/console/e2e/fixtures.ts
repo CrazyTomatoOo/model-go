@@ -22,14 +22,19 @@ export type AuthReply = {
  */
 export type AuthMocks = Partial<Record<'me' | 'login' | 'password' | 'logout', AuthReply>>;
 
-/** A signed-in /auth/me response for an active user (no forced password change). */
-export function signedInMe(username = 'sysadmin'): AuthReply {
+/**
+ * A signed-in /auth/me response for an active user (no forced password
+ * change). Pass displayName to exercise the shell avatar's display_name
+ * derivation (#36); the current backend contract omits the field.
+ */
+export function signedInMe(username = 'sysadmin', displayName?: string): AuthReply {
   return {
     status: 200,
     body: {
       user: {
         id: 1,
         username,
+        ...(displayName !== undefined ? { display_name: displayName } : {}),
         role: 'sysadmin',
         status: 'active',
         must_change_password: false,
@@ -96,7 +101,18 @@ type ConsoleFixtures = {
 };
 
 export const test = base.extend<ConsoleFixtures>({
-  authMocks: [{}, { option: true }],
+  // A factory (not the shared `{}` literal) so every test gets its own mocks
+  // object — a constant default would leak per-test overrides across specs
+  // running on the same worker. Playwright requires the object-destructuring
+  // first argument (plain `({})` trips no-empty-pattern), so we destructure
+  // the context fixture and void it to keep both tools happy.
+  authMocks: [
+    async ({ context: _context }, use) => {
+      void _context;
+      await use({});
+    },
+    { option: true },
+  ],
   // The network layer is the API boundary: every test gets the auth stubs.
   page: async ({ page, authMocks }, use) => {
     await mockAuthApi(page, authMocks);
