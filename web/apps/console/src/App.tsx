@@ -3,8 +3,6 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import LocaleProvider from './antd/LocaleProvider';
 import LoginPage from './pages/LoginPage';
-import NotFoundPage from './pages/NotFoundPage';
-import ForbiddenPage from './pages/ForbiddenPage';
 import DocumentTitle from './router/DocumentTitle';
 import GuardLoading from './router/GuardLoading';
 import {
@@ -18,6 +16,8 @@ import { brandTheme } from './theme/brand';
 // 重页面走 dynamic import，避免全量进入首屏 bundle（issue #22）
 const ConsoleShellPage = lazy(() => import('./pages/ConsoleShellPage'));
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const ForbiddenPage = lazy(() => import('./pages/ForbiddenPage'));
 
 export default function App() {
   return (
