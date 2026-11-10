@@ -155,7 +155,11 @@ describe('App integration (AuthProvider + routes)', () => {
     expect(getCsrfToken()).toBe('tok-me');
   });
 
-  it('clears the session and returns to /login on logout', async () => {
+  // 15s budget: this test renders the full app through the lazy shell route,
+  // opens the user dropdown and the confirm dialog, and navigates back to the
+  // login page — the default 5s is too tight for a 2-core CI runner
+  // (flaked once on the pull_request run; always passed locally).
+  it('clears the session and returns to /login on logout', { timeout: 15_000 }, async () => {
     const fetchMock = stubRoutes([
       {
         method: 'GET',
