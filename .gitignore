@@ -13,3 +13,7 @@ dist/
 test-results/
 playwright-report/
 e2e-artifacts/
+
+# Agent tooling (omo / codegraph index)
+.omo/
+.codegraph/
